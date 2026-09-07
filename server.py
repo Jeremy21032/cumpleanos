@@ -1,0 +1,158 @@
+"""Sirve la página y permite cambiar fotos de /mome desde la web (sin abrir GitHub).
+
+En Render → Environment añade:
+  ADMIN_PIN     clave para /mome/editar
+  GITHUB_TOKEN  token con permiso Contents del repo
+Opcional:
+  GITHUB_REPO   por defecto Jeremy21032/cumpleanos
+  GITHUB_BRANCH por defecto main
+"""
+import base64
+import hmac
+import io
+import os
+from pathlib import Path
+
+import requests
+from flask import Flask, abort, jsonify, redirect, request, send_from_directory
+from PIL import Image
+
+ROOT = Path(__file__).resolve().parent
+app = Flask(__name__, static_folder=None)
+
+SLOTS = {str(i): f"mome/fotos/{i}.jpg" for i in range(1, 7)}
+SLOTS["final"] = "mome/fotos/final.jpg"
+BLOCKED = {
+    "server.py",
+    "requirements.txt",
+    "Dockerfile",
+    "render.yaml",
+    ".gitignore",
+    ".dockerignore",
+    "nginx.conf.template",
+}
+
+
+def env(name, default=""):
+    return os.environ.get(name, default).strip()
+
+
+def pin_ok(got):
+    expected = env("ADMIN_PIN")
+    if not expected or not got:
+        return False
+    return hmac.compare_digest(got.encode("utf-8"), expected.encode("utf-8"))
+
+
+def to_jpeg(raw):
+    img = Image.open(io.BytesIO(raw))
+    if img.mode in ("RGBA", "P"):
+        img = img.convert("RGB")
+    elif img.mode != "RGB":
+        img = img.convert("RGB")
+    img.thumbnail((1400, 1400))
+    out = io.BytesIO()
+    img.save(out, format="JPEG", quality=82, optimize=True)
+    return out.getvalue()
+
+
+def github_headers():
+    token = env("GITHUB_TOKEN")
+    if not token:
+        return None
+    return {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+
+
+def commit_file(path, data, message):
+    repo = env("GITHUB_REPO", "Jeremy21032/cumpleanos")
+    branch = env("GITHUB_BRANCH", "main")
+    headers = github_headers()
+    if not headers:
+        raise RuntimeError("Falta GITHUB_TOKEN en Render")
+    url = f"https://api.github.com/repos/{repo}/contents/{path}"
+    current = requests.get(url, headers=headers, params={"ref": branch}, timeout=30)
+    sha = None
+    if current.status_code == 200:
+        sha = current.json().get("sha")
+    elif current.status_code != 404:
+        raise RuntimeError(f"GitHub GET {current.status_code}: {current.text[:300]}")
+    payload = {
+        "message": message,
+        "content": base64.b64encode(data).decode("ascii"),
+        "branch": branch,
+    }
+    if sha:
+        payload["sha"] = sha
+    put = requests.put(url, headers=headers, json=payload, timeout=60)
+    if put.status_code not in (200, 201):
+        raise RuntimeError(f"GitHub PUT {put.status_code}: {put.text[:400]}")
+    return put.json()
+
+
+@app.get("/mome/editar")
+@app.get("/mome/editar.html")
+def editor():
+    return send_from_directory(ROOT / "mome", "editar.html")
+
+
+@app.post("/mome/api/foto")
+def api_foto():
+    if not env("ADMIN_PIN") or not env("GITHUB_TOKEN"):
+        return jsonify(error="Falta configurar ADMIN_PIN y GITHUB_TOKEN en Render."), 503
+    if not pin_ok(request.form.get("pin", "")):
+        return jsonify(error="PIN incorrecto"), 401
+    slot = (request.form.get("slot") or "").strip()
+    path = SLOTS.get(slot)
+    if not path:
+        return jsonify(error="Elige una foto (1–6 o final)"), 400
+    uploaded = request.files.get("foto")
+    if not uploaded or not uploaded.filename:
+        return jsonify(error="Sube una imagen"), 400
+    try:
+        jpeg = to_jpeg(uploaded.read())
+        commit_file(path, jpeg, f"Actualizar foto {slot} de Mome desde la web.")
+    except Exception as exc:
+        return jsonify(error=str(exc)), 502
+    # también deja el archivo en este contenedor para verse al instante
+    dest = ROOT / path
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(jpeg)
+    return jsonify(ok=True, path=f"/{path}", mensaje="Listo. Render tardará ~1 minuto en el resto de servidores.")
+
+
+@app.get("/mome/")
+def mome_index():
+    return send_from_directory(ROOT / "mome", "index.html")
+
+
+@app.get("/mome")
+def mome_redir():
+    return redirect("/mome/", 301)
+
+
+@app.get("/")
+def home():
+    return send_from_directory(ROOT, "index.html")
+
+
+@app.get("/<path:path>")
+def public_file(path):
+    if path.startswith("mome/api"):
+        abort(404)
+    name = Path(path).name
+    if name in BLOCKED or path.startswith(".git"):
+        abort(404)
+    target = (ROOT / path).resolve()
+    if ROOT not in target.parents and target != ROOT:
+        abort(404)
+    if not target.is_file():
+        abort(404)
+    return send_from_directory(target.parent, target.name)
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(env("PORT") or "10000"))

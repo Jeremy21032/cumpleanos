@@ -3,92 +3,85 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cambiar fotos de Mome</title>
+  <title>Editar fotos · Mome</title>
   <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .editor { padding-bottom: 80px; }
+    .slots { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0 20px; }
+    .slot-card { border: 1px solid rgba(160,120,70,0.28); border-radius: 12px; overflow: hidden; background: #fff; cursor: pointer; }
+    .slot-card img { width: 100%; height: 120px; object-fit: cover; display: block; }
+    .slot-card p { font-size: 12px; text-align: center; padding: 8px; color: #9b7a52; }
+    .slot-card.elegida { outline: 2px solid #c0785a; }
+    .estado { min-height: 1.4em; color: #9b7a52; font-style: italic; text-align: center; margin-top: 14px; }
+  </style>
 </head>
 <body>
   <div class="editor">
     <h1>Fotos de Mome</h1>
-    <p class="lead">Cambia una foto de la sorpresa. GitHub queda en segundo plano: Render se actualiza solo.</p>
+    <p class="lead">Cambia una imagen aquí. El link de la sorpresa se actualiza solo; no hace falta GitHub.</p>
 
-    <form id="formFoto">
-      <label for="slot">Qué foto cambiar</label>
-      <select id="slot" name="slot" required>
-        <option value="1">Polaroid 1</option>
-        <option value="2">Polaroid 2</option>
-        <option value="3">Polaroid 3</option>
-        <option value="4">Polaroid 4</option>
-        <option value="5">Polaroid 5</option>
-        <option value="6">Polaroid 6</option>
-        <option value="final">Foto final</option>
-      </select>
+    <label>Qué foto quieres cambiar</label>
+    <div class="slots" id="slots"></div>
 
-      <label>Foto actual</label>
-      <div class="fotos-grid">
-        <div class="foto-slot wide" id="previewWrap">
-          <img id="preview" src="/mome/fotos/1.jpg" alt="Foto actual">
-        </div>
-      </div>
+    <label for="foto">Nueva imagen</label>
+    <input id="foto" type="file" accept="image/*">
 
-      <label for="file">Nueva imagen</label>
-      <input id="file" name="file" type="file" accept="image/*" required>
+    <label for="pin">PIN</label>
+    <input id="pin" type="password" autocomplete="current-password" placeholder="El que pusiste en Render">
 
-      <label for="pin">PIN</label>
-      <input id="pin" name="pin" type="password" inputmode="numeric" autocomplete="off" required>
-
-      <div class="acciones">
-        <button type="submit" id="btnEnviar">Guardar en la web</button>
-        <a class="btn secundario" href="/mome/">Ver la sorpresa</a>
-      </div>
-    </form>
-    <p class="aviso" id="aviso">Después de guardar, espera ~1 minuto y recarga /mome.</p>
+    <div class="acciones">
+      <button type="button" id="btnSubir">Guardar foto</button>
+      <a class="btn" href="/mome/" style="background:transparent;color:#9b7a52;border:1px solid rgba(155,122,82,0.4)">Ver la sorpresa</a>
+    </div>
+    <p class="estado" id="estado"></p>
   </div>
-
   <script>
-    (function () {
-      var slot = document.getElementById("slot");
-      var preview = document.getElementById("preview");
-      var aviso = document.getElementById("aviso");
-      var btn = document.getElementById("btnEnviar");
-
-      function srcActual() {
-        return slot.value === "final" ? "/mome/fotos/final.jpg" : "/mome/fotos/" + slot.value + ".jpg";
-      }
-      function pintar() {
-        preview.src = srcActual() + "?t=" + Date.now();
-      }
-      slot.addEventListener("change", pintar);
-
-      document.getElementById("formFoto").addEventListener("submit", function (e) {
-        e.preventDefault();
-        var data = new FormData();
-        data.append("slot", slot.value);
-        data.append("pin", document.getElementById("pin").value);
-        var file = document.getElementById("file").files[0];
-        if (!file) {
-          aviso.textContent = "Elige una imagen.";
-          return;
-        }
-        data.append("file", file);
-        btn.disabled = true;
-        btn.textContent = "Guardando…";
-        aviso.textContent = "Subiendo al servidor…";
-        fetch("/mome/api/foto", { method: "POST", body: data })
-          .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-          .then(function (res) {
-            if (!res.ok || !res.j.ok) throw new Error((res.j && res.j.error) || "No se pudo guardar");
-            aviso.textContent = "Listo. Render tardará ~1 minuto; recarga /mome.";
-            document.getElementById("file").value = "";
-          })
-          .catch(function (err) {
-            aviso.textContent = err.message || "Error";
-          })
-          .then(function () {
-            btn.disabled = false;
-            btn.textContent = "Guardar en la web";
-          });
+    var slot = "1";
+    var wrap = document.getElementById("slots");
+    var items = [
+      ["1", "Polaroid 1", "/mome/fotos/1.jpg"],
+      ["2", "Polaroid 2", "/mome/fotos/2.jpg"],
+      ["3", "Polaroid 3", "/mome/fotos/3.jpg"],
+      ["4", "Polaroid 4", "/mome/fotos/4.jpg"],
+      ["5", "Polaroid 5", "/mome/fotos/5.jpg"],
+      ["6", "Polaroid 6", "/mome/fotos/6.jpg"],
+      ["final", "Foto final", "/mome/fotos/final.jpg"]
+    ];
+    wrap.innerHTML = items.map(function (it, i) {
+      return '<div class="slot-card' + (i === 0 ? " elegida" : "") + '" data-slot="' + it[0] + '">' +
+        '<img src="' + it[2] + '?t=' + Date.now() + '" alt="' + it[1] + '">' +
+        "<p>" + it[1] + "</p></div>";
+    }).join("");
+    wrap.addEventListener("click", function (e) {
+      var card = e.target.closest(".slot-card");
+      if (!card) return;
+      slot = card.getAttribute("data-slot");
+      wrap.querySelectorAll(".slot-card").forEach(function (c) {
+        c.classList.toggle("elegida", c === card);
       });
-    })();
+    });
+
+    document.getElementById("btnSubir").addEventListener("click", function () {
+      var file = document.getElementById("foto").files[0];
+      var pin = document.getElementById("pin").value;
+      var estado = document.getElementById("estado");
+      if (!file) { estado.textContent = "Elige una imagen."; return; }
+      if (!pin) { estado.textContent = "Escribe el PIN."; return; }
+      var data = new FormData();
+      data.append("slot", slot);
+      data.append("pin", pin);
+      data.append("foto", file);
+      estado.textContent = "Subiendo…";
+      fetch("/mome/api/foto", { method: "POST", body: data })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+        .then(function (res) {
+          if (!res.ok) { estado.textContent = res.j.error || "No se pudo guardar."; return; }
+          estado.textContent = res.j.mensaje || "Listo.";
+          var img = wrap.querySelector('[data-slot="' + slot + '"] img');
+          if (img) img.src = "/mome/fotos/" + (slot === "final" ? "final" : slot) + ".jpg?t=" + Date.now();
+        })
+        .catch(function () { estado.textContent = "Error de red. Inténtalo de nuevo."; });
+    });
   </script>
 </body>
 </html>
