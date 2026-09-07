@@ -47,7 +47,11 @@ def pin_ok(got):
     expected = env("ADMIN_PIN")
     if not expected or not got:
         return False
-    return hmac.compare_digest(got.encode("utf-8"), expected.encode("utf-8"))
+    got_b = got.encode("utf-8")
+    exp_b = expected.encode("utf-8")
+    if len(got_b) != len(exp_b):
+        return False
+    return hmac.compare_digest(got_b, exp_b)
 
 
 def to_jpeg(raw):
@@ -140,6 +144,75 @@ def load_config_local():
     return parse_config(text)
 
 
+TEXT_KEYS = (
+    "destinatario",
+    "remitente",
+    "fecha",
+    "titulo",
+    "intro",
+    "mensajesCorazon",
+    "carta",
+    "capitulo",
+    "brindis",
+    "fraseFinal",
+    "footer",
+    "cancionInicio",
+    "sobreHint",
+    "lacre",
+)
+BR_KEYS = ("titulo", "capitulo", "brindis", "fraseFinal")
+
+
+def require_admin():
+    if not env("ADMIN_PIN") or not env("GITHUB_TOKEN"):
+        return jsonify(error="Falta configurar ADMIN_PIN y GITHUB_TOKEN en Render."), 503
+    pin = ""
+    if request.is_json:
+        pin = str((request.get_json(silent=True) or {}).get("pin") or "")
+    if not pin:
+        pin = request.form.get("pin", "")
+    if not pin_ok(pin):
+        return jsonify(error="PIN incorrecto"), 401
+    return None
+
+
+def as_lines(value, blank_paragraphs=False):
+    if isinstance(value, list):
+        items = [str(x).strip() for x in value]
+        return [x for x in items if x or blank_paragraphs]
+    text = str(value or "").replace("\r\n", "\n").replace("\r", "\n")
+    if blank_paragraphs and "\n\n" in text:
+        parts = re.split(r"\n\s*\n", text)
+    else:
+        parts = text.split("\n")
+    return [p.strip() for p in parts if p.strip()]
+
+
+def to_br(value):
+    text = str(value or "").replace("\r\n", "\n").replace("\r", "\n")
+    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.I)
+    return "<br>".join(text.split("\n"))
+
+
+def apply_textos(cfg, payload):
+    for key in TEXT_KEYS:
+        if key not in payload:
+            continue
+        value = payload[key]
+        if key in ("mensajesCorazon", "carta"):
+            cfg[key] = as_lines(value, blank_paragraphs=(key == "carta"))
+        elif key == "cancionInicio":
+            try:
+                cfg[key] = max(0, int(float(value)))
+            except (TypeError, ValueError):
+                cfg[key] = 0
+        elif key in BR_KEYS:
+            cfg[key] = to_br(value)
+        else:
+            cfg[key] = str(value if value is not None else "")
+    return cfg
+
+
 @app.get("/mome/editar")
 @app.get("/mome/editar.html")
 def editor():
@@ -162,12 +235,48 @@ def api_estado():
     )
 
 
+@app.get("/mome/api/config")
+def api_config():
+    try:
+        cfg = load_config_local()
+    except Exception as exc:
+        return jsonify(error=str(exc)), 500
+    textos = {key: cfg.get(key) for key in TEXT_KEYS}
+    return jsonify(ok=True, config=textos, fotos=list(cfg.get("fotos") or []))
+
+
+@app.post("/mome/api/textos")
+def api_textos():
+    denied = require_admin()
+    if denied:
+        return denied
+    payload = request.get_json(silent=True) if request.is_json else None
+    if not payload:
+        payload = request.form.to_dict()
+    try:
+        cfg_raw, _sha = github_get_bytes(CONFIG_PATH)
+        cfg = parse_config(cfg_raw.decode("utf-8"))
+        fotos = list(cfg.get("fotos") or [])
+        foto_final = cfg.get("fotoFinal")
+        cancion = cfg.get("cancion")
+        apply_textos(cfg, payload)
+        cfg["fotos"] = fotos
+        if foto_final:
+            cfg["fotoFinal"] = foto_final
+        if cancion is not None:
+            cfg["cancion"] = cancion
+        commit_file(CONFIG_PATH, dump_config(cfg).encode("utf-8"), "Actualizar textos de /mome desde la web.")
+        (ROOT / CONFIG_PATH).write_text(dump_config(cfg), encoding="utf-8")
+    except Exception as exc:
+        return jsonify(error=str(exc)), 502
+    return jsonify(ok=True, mensaje="Textos guardados. Espera ~1 minuto y recarga /mome.")
+
+
 @app.post("/mome/api/foto")
 def api_foto():
-    if not env("ADMIN_PIN") or not env("GITHUB_TOKEN"):
-        return jsonify(error="Falta configurar ADMIN_PIN y GITHUB_TOKEN en Render."), 503
-    if not pin_ok(request.form.get("pin", "")):
-        return jsonify(error="PIN incorrecto"), 401
+    denied = require_admin()
+    if denied:
+        return denied
     slot = (request.form.get("slot") or "").strip()
     uploaded = request.files.get("foto") or request.files.get("file")
     if not uploaded or not uploaded.filename:

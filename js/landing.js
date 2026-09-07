@@ -170,25 +170,49 @@
     var total = track.children.length;
     var idx = 0;
     var carrusel = document.getElementById("carrusel");
+    var wrap = document.getElementById("polaroidWrap");
     var startX = 0;
     var deltaX = 0;
     var dragging = false;
+    var visible = false;
+    var timer = null;
+    var AUTO_MS = 5000;
+    var AFTER_USER_MS = 8000;
 
-    function ir(i) {
+    function pararAuto() {
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    }
+
+    function programarAuto(delay) {
+      pararAuto();
+      if (total < 2 || !visible || dragging) return;
+      timer = setTimeout(function () {
+        timer = null;
+        if (!visible || dragging || total < 2) return;
+        ir((idx + 1) % total, false);
+      }, delay == null ? AUTO_MS : delay);
+    }
+
+    function ir(i, fromUser) {
       idx = Math.max(0, Math.min(total - 1, i));
       track.style.transition = "transform 0.5s cubic-bezier(0.22, 1, 0.36, 1)";
       track.style.transform = "translateX(calc(-" + (idx * 100) + "%))";
       dots.forEach(function (d, j) { d.classList.toggle("activo", j === idx); });
+      programarAuto(fromUser ? AFTER_USER_MS : AUTO_MS);
     }
 
     dots.forEach(function (d) {
-      d.addEventListener("click", function () { ir(Number(d.dataset.i)); });
+      d.addEventListener("click", function () { ir(Number(d.dataset.i), true); });
     });
 
     function pointerStart(x) {
       startX = x;
       deltaX = 0;
       dragging = true;
+      pararAuto();
       track.style.transition = "none";
     }
     function pointerMove(x) {
@@ -200,9 +224,9 @@
     function pointerEnd() {
       if (!dragging) return;
       dragging = false;
-      if (deltaX > 50) ir(idx - 1);
-      else if (deltaX < -50) ir(idx + 1);
-      else ir(idx);
+      if (deltaX > 50) ir(idx - 1, true);
+      else if (deltaX < -50) ir(idx + 1, true);
+      else ir(idx, true);
     }
 
     carrusel.addEventListener("touchstart", function (e) { pointerStart(e.touches[0].clientX); }, { passive: true });
@@ -211,6 +235,25 @@
     carrusel.addEventListener("mousedown", function (e) { e.preventDefault(); pointerStart(e.clientX); });
     window.addEventListener("mousemove", function (e) { pointerMove(e.clientX); });
     window.addEventListener("mouseup", pointerEnd);
+
+    function setVisible(on) {
+      visible = !!on;
+      if (visible) programarAuto(AUTO_MS);
+      else pararAuto();
+    }
+
+    var target = wrap || carrusel;
+    if (total >= 2 && "IntersectionObserver" in window && target) {
+      var obs = new IntersectionObserver(function (entradas) {
+        entradas.forEach(function (entrada) {
+          setVisible(entrada.isIntersecting);
+        });
+      }, { threshold: 0.35 });
+      obs.observe(target);
+    } else if (total >= 2) {
+      var landing = document.getElementById("landing");
+      setVisible(landing && landing.style.display !== "none");
+    }
   }
 
   function lanzarConfetiDesdeArriba() {

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Editar fotos · Mome</title>
+  <title>Editar Mome</title>
   <link rel="stylesheet" href="/css/style.css">
   <style>
     .editor { padding-bottom: 80px; }
@@ -15,14 +15,20 @@
     .slot-card.icono { min-height: 120px; display: flex; flex-direction: column; }
     .slot-card.icono .glyph { height: 120px; display: flex; align-items: center; justify-content: center; font-size: 42px; }
     .estado { min-height: 1.4em; color: #9b7a52; font-style: italic; text-align: center; margin-top: 14px; }
+    .seccion { margin-top: 36px; padding-top: 8px; border-top: 1px solid rgba(160,120,70,0.18); }
+    .editor textarea.corto { min-height: 110px; }
+    .editor textarea.largo { min-height: 220px; }
+    .hint { font-size: 13px; color: #b0a08a; font-style: italic; margin: 0 0 8px; }
+    .qr-box { text-align: center; }
+    .qr-box img { width: 220px; height: 220px; background: #fff; padding: 10px; border-radius: 12px; border: 1px solid rgba(160,120,70,0.28); margin: 8px auto 12px; display: block; }
   </style>
 </head>
 <body>
   <div class="editor">
-    <h1>Fotos de Mome</h1>
-    <p class="lead">Cambia una foto, añade otra al polaroid o sube la canción. No hace falta GitHub.</p>
+    <h1>Editar Mome</h1>
+    <p class="lead">Cambia fotos, canción o textos. No hace falta GitHub.</p>
 
-    <label>Qué quieres cambiar</label>
+    <label>Qué archivo quieres cambiar</label>
     <div class="slots" id="slots"></div>
 
     <label for="foto">Archivo nuevo</label>
@@ -32,19 +38,85 @@
     <input id="pin" type="password" autocomplete="current-password" placeholder="El que pusiste en Render">
 
     <div class="acciones">
-      <button type="button" id="btnSubir">Guardar</button>
+      <button type="button" id="btnSubir">Guardar archivo</button>
       <button type="button" class="secundario" id="btnAnadir">Añadir foto</button>
-      <a class="btn secundario" href="/mome/">Ver la sorpresa</a>
     </div>
-    <p class="estado" id="estado">Para sumar una al polaroid: Añadir foto → elige la imagen → PIN → Guardar. Espera ~1 minuto y recarga /mome.</p>
+    <p class="estado" id="estado">Fotos: elige una miniatura o Añadir foto → archivo → PIN → Guardar archivo.</p>
+
+    <div class="seccion">
+      <h1>Textos</h1>
+      <p class="lead">Si no te gusta alguna frase, cámbiala aquí y pulsa Guardar textos.</p>
+      <div class="row">
+        <div>
+          <label for="destinatario">Destinatario</label>
+          <input id="destinatario" type="text">
+        </div>
+        <div>
+          <label for="remitente">Remitente</label>
+          <input id="remitente" type="text">
+        </div>
+      </div>
+      <label for="fecha">Fecha</label>
+      <input id="fecha" type="text">
+      <label for="intro">Intro (corazón)</label>
+      <input id="intro" type="text">
+      <label for="titulo">Título</label>
+      <p class="hint">Un salto de línea = un corte en la página.</p>
+      <textarea id="titulo" class="corto"></textarea>
+      <label for="mensajesCorazon">Mensajes del corazón (uno por línea)</label>
+      <textarea id="mensajesCorazon" class="corto"></textarea>
+      <label for="sobreHint">Texto bajo el lacre</label>
+      <input id="sobreHint" type="text">
+      <label for="lacre">Lacre</label>
+      <input id="lacre" type="text">
+      <label for="carta">Carta</label>
+      <p class="hint">Separa párrafos con una línea en blanco.</p>
+      <textarea id="carta" class="largo"></textarea>
+      <label for="capitulo">Capítulo</label>
+      <textarea id="capitulo" class="corto"></textarea>
+      <label for="brindis">Brindis</label>
+      <textarea id="brindis" class="corto"></textarea>
+      <label for="fraseFinal">Frase final</label>
+      <textarea id="fraseFinal" class="corto"></textarea>
+      <label for="footer">Pie</label>
+      <input id="footer" type="text">
+      <label for="cancionInicio">Canción: segundo de inicio</label>
+      <input id="cancionInicio" type="number" min="0" step="1" value="0">
+      <div class="acciones">
+        <button type="button" id="btnTextos">Guardar textos</button>
+        <a class="btn secundario" href="/mome/">Ver la sorpresa</a>
+      </div>
+      <p class="estado" id="estadoTextos">Usa el mismo PIN de arriba. Espera ~1 minuto y recarga /mome.</p>
+    </div>
+
+    <div class="seccion qr-box">
+      <h1>Código QR</h1>
+      <p class="lead">Este QR es eterno porque solo contiene tu URL; las fotos/textos se actualizan detrás.</p>
+      <img src="/mome/qr.png" alt="QR de la página de Mome" width="220" height="220">
+      <p class="hint">Imprime o comparte este archivo. No cambies la ruta /mome o habría que reimprimir el QR.</p>
+      <div class="acciones">
+        <a class="btn" href="/mome/qr.png" download="mome-qr.png">Descargar QR</a>
+        <a class="btn secundario" href="/mome/qr.svg" download="mome-qr.svg">Descargar SVG</a>
+      </div>
+    </div>
   </div>
   <script>
     var slot = "1";
     var wrap = document.getElementById("slots");
     var estado = document.getElementById("estado");
+    var estadoTextos = document.getElementById("estadoTextos");
     var btnAnadir = document.getElementById("btnAnadir");
     var siguiente = 7;
     var maxFotos = 12;
+    var BR_IDS = ["titulo", "capitulo", "brindis", "fraseFinal"];
+
+    function brToNl(s) {
+      return String(s || "").replace(/<br\s*\/?>/gi, "\n");
+    }
+    function asList(v) {
+      if (Array.isArray(v)) return v;
+      return String(v || "").split(/\n/).map(function (x) { return x.trim(); }).filter(Boolean);
+    }
 
     function pintarSlots(fotos) {
       fotos = fotos || [];
@@ -70,6 +142,25 @@
       btnAnadir.textContent = lleno ? "Máximo 12 fotos" : "Añadir foto";
     }
 
+    function rellenarTextos(c) {
+      if (!c) return;
+      document.getElementById("destinatario").value = c.destinatario || "";
+      document.getElementById("remitente").value = c.remitente || "";
+      document.getElementById("fecha").value = c.fecha || "";
+      document.getElementById("intro").value = c.intro || "";
+      document.getElementById("sobreHint").value = c.sobreHint || "";
+      document.getElementById("lacre").value = c.lacre || "";
+      document.getElementById("footer").value = c.footer || "";
+      document.getElementById("cancionInicio").value = c.cancionInicio != null ? c.cancionInicio : 0;
+      BR_IDS.forEach(function (id) {
+        document.getElementById(id).value = brToNl(c[id]);
+      });
+      document.getElementById("mensajesCorazon").value = asList(c.mensajesCorazon).join("\n");
+      document.getElementById("carta").value = Array.isArray(c.carta)
+        ? c.carta.join("\n\n")
+        : brToNl(c.carta);
+    }
+
     function cargarEstado() {
       return fetch("/mome/api/estado")
         .then(function (r) { return r.json(); })
@@ -80,7 +171,18 @@
         })
         .catch(function () { pintarSlots(["/mome/fotos/1.jpg","/mome/fotos/2.jpg","/mome/fotos/3.jpg","/mome/fotos/4.jpg","/mome/fotos/5.jpg","/mome/fotos/6.jpg"]); });
     }
+
+    function cargarTextos() {
+      return fetch("/mome/api/config")
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          if (j && j.config) rellenarTextos(j.config);
+        })
+        .catch(function () {});
+    }
+
     cargarEstado();
+    cargarTextos();
 
     wrap.addEventListener("click", function (e) {
       var card = e.target.closest(".slot-card");
@@ -91,8 +193,8 @@
       });
       document.getElementById("foto").accept = slot === "cancion" ? "audio/*" : "image/*";
       estado.textContent = slot === "nueva"
-        ? "Va a ser la polaroid " + siguiente + ". Elige la imagen, pon el PIN y Guardar."
-        : "Reemplaza esta y pulsa Guardar.";
+        ? "Va a ser la polaroid " + siguiente + ". Elige la imagen, pon el PIN y Guardar archivo."
+        : "Reemplaza esta y pulsa Guardar archivo.";
     });
 
     btnAnadir.addEventListener("click", function () {
@@ -104,7 +206,7 @@
       wrap.querySelectorAll(".slot-card").forEach(function (c) { c.classList.remove("elegida"); });
       document.getElementById("foto").accept = "image/*";
       document.getElementById("foto").click();
-      estado.textContent = "Nueva polaroid (será la " + siguiente + "). Elige la imagen, PIN y Guardar.";
+      estado.textContent = "Nueva polaroid (será la " + siguiente + "). Elige la imagen, PIN y Guardar archivo.";
     });
 
     document.getElementById("btnSubir").addEventListener("click", function () {
@@ -127,6 +229,40 @@
           cargarEstado();
         })
         .catch(function () { estado.textContent = "Error de red. Inténtalo de nuevo."; });
+    });
+
+    document.getElementById("btnTextos").addEventListener("click", function () {
+      var pin = document.getElementById("pin").value;
+      if (!pin) { estadoTextos.textContent = "Escribe el PIN arriba."; return; }
+      var body = {
+        pin: pin,
+        destinatario: document.getElementById("destinatario").value,
+        remitente: document.getElementById("remitente").value,
+        fecha: document.getElementById("fecha").value,
+        intro: document.getElementById("intro").value,
+        titulo: document.getElementById("titulo").value,
+        mensajesCorazon: document.getElementById("mensajesCorazon").value,
+        sobreHint: document.getElementById("sobreHint").value,
+        lacre: document.getElementById("lacre").value,
+        carta: document.getElementById("carta").value,
+        capitulo: document.getElementById("capitulo").value,
+        brindis: document.getElementById("brindis").value,
+        fraseFinal: document.getElementById("fraseFinal").value,
+        footer: document.getElementById("footer").value,
+        cancionInicio: document.getElementById("cancionInicio").value
+      };
+      estadoTextos.textContent = "Guardando textos…";
+      fetch("/mome/api/textos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+        .then(function (res) {
+          if (!res.ok) { estadoTextos.textContent = res.j.error || "No se pudieron guardar."; return; }
+          estadoTextos.textContent = res.j.mensaje || "Listo. Espera ~1 minuto y recarga /mome.";
+        })
+        .catch(function () { estadoTextos.textContent = "Error de red. Inténtalo de nuevo."; });
     });
   </script>
 </body>
