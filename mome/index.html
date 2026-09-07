@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Andres & Mome</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="intro">
+    <div id="introNombre"></div>
+    <p id="introMsg">Toca el corazón</p>
+    <button id="heartBtn" aria-label="Tocar corazón">&#9829;</button>
+    <div class="barra-wrap"><div class="barra-fill" id="barraFill"></div></div>
+    <p id="pctText">0%</p>
+  </div>
+
+  <div id="landing">
+    <div id="flashLayer"></div>
+    <div class="wrap">
+      <div class="frase-principal" id="frasePrincipal"></div>
+      <div class="fecha-pequena" id="fechaTexto"></div>
+
+      <div class="polaroid-wrap" id="polaroidWrap">
+        <div class="polaroid">
+          <div class="carrusel" id="carrusel">
+            <div class="carrusel-track" id="carruselTrack"></div>
+          </div>
+          <div class="dots" id="dots"></div>
+          <svg class="polaroid-deco" viewBox="0 0 260 60" xmlns="http://www.w3.org/2000/svg">
+            <g class="fw-group a" stroke="#c0785a" stroke-width="1.3" stroke-linecap="round">
+              <line x1="34" y1="30" x2="34" y2="12"/><line x1="34" y1="30" x2="34" y2="48"/>
+              <line x1="25" y1="30" x2="6" y2="30"/><line x1="43" y1="30" x2="62" y2="30"/>
+              <line x1="28" y1="24" x2="14" y2="13"/><line x1="40" y1="24" x2="54" y2="13"/>
+              <line x1="28" y1="36" x2="14" y2="47"/><line x1="40" y1="36" x2="54" y2="47"/>
+            </g>
+            <g class="fw-group b" stroke="#e0a458" stroke-width="1.3" stroke-linecap="round">
+              <line x1="226" y1="30" x2="226" y2="12"/><line x1="226" y1="30" x2="226" y2="48"/>
+              <line x1="217" y1="30" x2="198" y2="30"/><line x1="235" y1="30" x2="254" y2="30"/>
+              <line x1="220" y1="24" x2="206" y2="13"/><line x1="232" y1="24" x2="246" y2="13"/>
+              <line x1="220" y1="36" x2="206" y2="47"/><line x1="232" y1="36" x2="246" y2="47"/>
+            </g>
+            <path d="M78 10 Q130 38 182 10" stroke="#c9a988" stroke-width="1.1" fill="none" opacity="0.7"/>
+            <polygon points="82,13 91,13 86.5,26" fill="#d4547e" opacity="0.85"/>
+            <polygon points="97,19 106,19 101.5,32" fill="#5dcaa5" opacity="0.85"/>
+            <polygon points="113,23 122,23 117.5,36" fill="#e0a458" opacity="0.85"/>
+            <polygon points="129,24 138,24 133.5,37" fill="#7f77dd" opacity="0.85"/>
+            <polygon points="145,23 154,23 149.5,36" fill="#d4547e" opacity="0.85"/>
+            <polygon points="161,19 170,19 165.5,32" fill="#5dcaa5" opacity="0.85"/>
+            <polygon points="176,13 185,13 180.5,26" fill="#e0a458" opacity="0.85"/>
+          </svg>
+        </div>
+      </div>
+
+      <svg class="hilo-svg" viewBox="0 0 60 30" fill="none">
+        <path d="M5 15 Q15 5 30 15 Q45 25 55 15" stroke="#c0785a" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="5" cy="15" r="2" fill="#c0785a" opacity="0.6"/>
+        <circle cx="55" cy="15" r="2" fill="#c0785a" opacity="0.6"/>
+      </svg>
+
+      <div class="sobre-container" id="sobre">
+        <div class="sobre-body">
+          <div class="lacre">
+            <svg width="80" height="80" viewBox="0 0 90 90" fill="none">
+              <defs>
+                <radialGradient id="cB" cx="38%" cy="35%" r="60%"><stop offset="0%" stop-color="#b02020"/><stop offset="35%" stop-color="#8a1515"/><stop offset="70%" stop-color="#6b0e0e"/><stop offset="100%" stop-color="#4a0808"/></radialGradient>
+                <radialGradient id="cL" cx="30%" cy="28%" r="45%"><stop offset="0%" stop-color="rgba(255,180,160,0.35)"/><stop offset="100%" stop-color="rgba(0,0,0,0)"/></radialGradient>
+                <filter id="lB"><feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="3" seed="5"/><feDisplacementMap in="SourceGraphic" scale="3"/></filter>
+                <filter id="sB"><feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#4a0808" flood-opacity="0.55"/></filter>
+                <clipPath id="cC"><circle cx="45" cy="45" r="38"/></clipPath>
+              </defs>
+              <circle cx="45" cy="47" r="37" fill="rgba(0,0,0,0.18)" filter="url(#sB)"/>
+              <g filter="url(#lB)"><circle cx="45" cy="45" r="38" fill="url(#cB)"/></g>
+              <circle cx="45" cy="45" r="38" fill="url(#cL)" clip-path="url(#cC)"/>
+              <circle cx="45" cy="45" r="35" fill="none" stroke="rgba(255,200,180,0.18)" stroke-width="1.5"/>
+              <text id="lacreTexto" x="45" y="48" text-anchor="middle" font-family="Georgia,serif" font-size="10.3" font-style="italic" text-decoration="underline" fill="rgba(255,215,195,0.92)" letter-spacing="0.5">Descúbrelo</text>
+            </svg>
+            <div class="sobre-hint" id="sobreHint">Hay algo dentro para ti</div>
+          </div>
+          <div class="carta-inner">
+            <div class="carta-iconos">&#127880;&#127874;&#127880;</div>
+            <div class="carta-texto" id="cartaTexto"></div>
+            <div class="capitulo-wrap">
+              <div class="capitulo-texto" id="capituloTexto"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="brindis-wrap" id="brindisWrap">
+        <div class="copas-escena">
+          <span class="mitad-copa" id="mitadIzq" style="clip-path:inset(0 50% 0 0);transform:translateX(-50px)">&#129346;</span>
+          <span class="mitad-copa" id="mitadDer" style="clip-path:inset(0 0 0 50%);transform:translateX(50px)">&#129346;</span>
+          <span class="brillo-fx" style="font-size:18px;left:50%;top:8px;transform:translate(-50%,0) scale(0.5)">&#10024;</span>
+          <span class="brillo-fx" style="font-size:14px;left:38%;top:20px;transform:translate(-50%,0) scale(0.5)">&#10024;</span>
+          <span class="brillo-fx" style="font-size:14px;left:62%;top:18px;transform:translate(-50%,0) scale(0.5)">&#10024;</span>
+          <span class="brillo-fx" style="font-size:12px;left:46%;top:38px;transform:translate(-50%,0) scale(0.5)">&#10024;</span>
+          <span class="brillo-fx" style="font-size:12px;left:58%;top:40px;transform:translate(-50%,0) scale(0.5)">&#10024;</span>
+        </div>
+        <div class="frase-brindis" id="fraseBrindis"></div>
+      </div>
+
+      <div class="foto-final-wrap" id="fotoFinalWrap">
+        <img id="imgFinal" alt="Foto" crossorigin="anonymous">
+      </div>
+
+      <div class="frase-final" id="fraseFinal"></div>
+
+      <div class="btn-guardar-wrap" id="btnGuardarWrap">
+        <button id="btnGuardar">Guardar este momento</button>
+      </div>
+
+      <div class="footer" id="footerTexto">Hecho con amor</div>
+    </div>
+  </div>
+  <div id="fxLayer"></div>
+
+  <script src="/mome/config.js"></script>
+  <script src="/js/config-store.js"></script>
+  <script src="/js/landing.js"></script>
+</body>
+</html>

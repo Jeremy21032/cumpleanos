@@ -5,6 +5,14 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    location = /mome {
+        return 301 /mome/;
+    }
+
+    location /mome/ {
+        try_files $uri $uri/ /mome/index.html;
+    }
+
     location / {
         try_files $uri $uri/ /index.html;
     }
