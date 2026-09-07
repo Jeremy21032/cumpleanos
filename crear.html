@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crear mi página</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="editor">
+    <h1>Tu propia sorpresa</h1>
+    <p class="lead">Misma experiencia que viste: corazón, polaroid, carta y brindis. Aquí la haces tuya.</p>
+
+    <div class="row">
+      <div>
+        <label for="destinatario">Para</label>
+        <input id="destinatario" type="text" placeholder="Cris">
+      </div>
+      <div>
+        <label for="remitente">De (opcional)</label>
+        <input id="remitente" type="text" placeholder="Greg">
+      </div>
+    </div>
+
+    <label for="fecha">Fecha</label>
+    <input id="fecha" type="text" placeholder="18 de junio">
+
+    <label for="titulo">Frase de apertura</label>
+    <textarea id="titulo" rows="2"></textarea>
+
+    <label for="intro">Texto del corazón</label>
+    <input id="intro" type="text">
+
+    <label for="mensajes">Mensajes al tocar el corazón (uno por línea)</label>
+    <textarea id="mensajes" rows="6"></textarea>
+
+    <label>Fotos del polaroid</label>
+    <div class="fotos-grid" id="fotosGrid"></div>
+    <div class="fotos-acciones">
+      <button type="button" class="btn-foto" id="btnAddFoto">Añadir otra foto</button>
+    </div>
+    <p class="aviso">Puedes poner de 1 a 12 fotos. El polaroid se desliza y muestra un punto por cada una.</p>
+    <input id="filePolaroid" type="file" accept="image/*" hidden>
+
+    <label for="carta">Carta</label>
+    <textarea id="carta"></textarea>
+
+    <label for="capitulo">Frase del capítulo</label>
+    <textarea id="capitulo" rows="2"></textarea>
+
+    <label for="brindis">Brindis</label>
+    <textarea id="brindis" rows="2"></textarea>
+
+    <label>Foto final</label>
+    <div class="fotos-grid">
+      <div class="foto-slot wide" id="slotFinal"><span>Foto final</span></div>
+    </div>
+    <input id="fileFinal" type="file" accept="image/*" hidden>
+
+    <label for="fraseFinal">Frase final</label>
+    <textarea id="fraseFinal" rows="2"></textarea>
+
+    <label for="footer">Pie</label>
+    <input id="footer" type="text">
+
+    <label for="cancionFile">Canción (opcional, mp3)</label>
+    <input id="cancionFile" type="file" accept="audio/*">
+    <p class="aviso">También puedes dejar un archivo en <code>assets/cancion.mp3</code>. Si pegas una canción aquí, suena en esta sesión del navegador.</p>
+
+    <label for="cancionInicio">Empezar la canción en el segundo</label>
+    <input id="cancionInicio" type="number" min="0" step="1" value="0">
+
+    <div class="acciones">
+      <button type="button" id="btnVer">Guardar y ver la sorpresa</button>
+      <button type="button" class="secundario" id="btnDescargar">Descargar página para compartir</button>
+      <button type="button" class="secundario" id="btnReset">Restablecer ejemplo</button>
+    </div>
+    <p class="aviso">“Guardar y ver” funciona en este navegador. “Descargar” crea un HTML único que puedes enviar o subir a Netlify Drop / GitHub Pages.</p>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="js/config-store.js"></script>
+  <script src="js/crear.js"></script>
+</body>
+</html>

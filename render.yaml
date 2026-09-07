@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: cumpleanos
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
