@@ -27,20 +27,24 @@
   function compressImage(file, maxSize, quality) {
     maxSize = maxSize || 900;
     quality = quality || 0.72;
-    return new Promise(function (resolve, reject) {
-      var img = new Image();
-      img.onload = function () {
-        var canvas = document.createElement("canvas");
-        var scale = Math.min(1, maxSize / Math.max(img.width, img.height));
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
-        var ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/jpeg", quality));
-        URL.revokeObjectURL(img.src);
-      };
-      img.onerror = reject;
-      img.src = URL.createObjectURL(file);
+    return fileToDataURL(file).then(function (dataUrl) {
+      return new Promise(function (resolve) {
+        var img = new Image();
+        img.onload = function () {
+          try {
+            var canvas = document.createElement("canvas");
+            var scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+            canvas.width = Math.max(1, Math.round(img.width * scale));
+            canvas.height = Math.max(1, Math.round(img.height * scale));
+            canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL("image/jpeg", quality));
+          } catch (err) {
+            resolve(dataUrl);
+          }
+        };
+        img.onerror = function () { resolve(dataUrl); };
+        img.src = dataUrl;
+      });
     });
   }
 

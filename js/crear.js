@@ -76,23 +76,38 @@
     return !src || src.indexOf("data:") !== 0;
   }
 
+  function avisoFotos(texto) {
+    var el = document.getElementById("fotosAviso");
+    if (el) el.textContent = texto;
+  }
+
   function agregarArchivos(fileList, reemplazarIndice) {
     var files = Array.prototype.slice.call(fileList || []).filter(function (f) {
-      return f && (/^image\//.test(f.type) || /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(f.name));
+      return f && (/^image\//.test(f.type) || /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(f.name) || !f.type);
     });
-    if (!files.length) return Promise.resolve();
+    if (!files.length) {
+      avisoFotos("No se pudieron leer las imágenes. Vuelve a elegirlas.");
+      return Promise.resolve();
+    }
 
     var hueco = MAX_FOTOS - fotos.filter(function (src) { return !esPlaceholder(src); }).length;
     if (reemplazarIndice != null && !esPlaceholder(fotos[reemplazarIndice])) hueco += 1;
     if (hueco <= 0) {
+      avisoFotos("Ya tienes " + MAX_FOTOS + " fotos.");
       pintarFotos();
       return Promise.resolve();
     }
     files = files.slice(0, hueco);
+    avisoFotos("Cargando " + files.length + " foto" + (files.length === 1 ? "" : "s") + "…");
 
     return Promise.all(files.map(function (file) {
-      return ConfigStore.compressImage(file);
+      return ConfigStore.compressImage(file).catch(function (err) {
+        console.error(err);
+        return ConfigStore.fileToDataURL(file);
+      });
     })).then(function (urls) {
+      urls = urls.filter(Boolean);
+      if (!urls.length) throw new Error("Ninguna imagen se pudo abrir");
       if (reemplazarIndice != null && urls.length === 1) {
         fotos[reemplazarIndice] = urls[0];
       } else if (fotos.every(esPlaceholder)) {
@@ -106,15 +121,20 @@
       }
       if (fotos.length > MAX_FOTOS) fotos = fotos.slice(0, MAX_FOTOS);
       pintarFotos();
+      avisoFotos(fotos.filter(function (s) { return !esPlaceholder(s); }).length + " fotos en el polaroid. Hasta 12.");
+    }).catch(function (err) {
+      console.error(err);
+      avisoFotos("No se pudieron cargar las fotos. Prueba otra vez.");
+      alert("No se pudieron cargar las fotos: " + ((err && err.message) || err));
     });
   }
 
   document.getElementById("filePolaroid").addEventListener("change", function (e) {
-    var lista = e.target.files;
+    var lista = Array.prototype.slice.call(e.target.files || []);
     var indice = slotActivo;
     e.target.value = "";
     slotActivo = null;
-    if (!lista || !lista.length) return;
+    if (!lista.length) return;
     agregarArchivos(lista, indice);
   });
 
@@ -231,4 +251,6 @@
     ConfigStore.clear();
     location.reload();
   });
+
+  window.cargarFotosPolaroid = agregarArchivos;
 })();
