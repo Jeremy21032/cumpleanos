@@ -39,7 +39,7 @@ window.CONFIG = {
     "/mome/fotos/6.jpg"
   ],
   "fotoFinal": "/mome/fotos/final.jpg",
-  "cancion": "",
+  "cancion": "/assets/cancion.mp3",
   "cancionInicio": 0,
   "exportado": true
 };

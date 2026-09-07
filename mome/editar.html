@@ -45,12 +45,15 @@
       ["4", "Polaroid 4", "/mome/fotos/4.jpg"],
       ["5", "Polaroid 5", "/mome/fotos/5.jpg"],
       ["6", "Polaroid 6", "/mome/fotos/6.jpg"],
-      ["final", "Foto final", "/mome/fotos/final.jpg"]
+      ["final", "Foto final", "/mome/fotos/final.jpg"],
+      ["cancion", "Canción", ""]
     ];
     wrap.innerHTML = items.map(function (it, i) {
+      var inner = it[0] === "cancion"
+        ? '<div style="height:120px;display:flex;align-items:center;justify-content:center;font-size:42px">♪</div>'
+        : '<img src="' + it[2] + '?t=' + Date.now() + '" alt="' + it[1] + '">';
       return '<div class="slot-card' + (i === 0 ? " elegida" : "") + '" data-slot="' + it[0] + '">' +
-        '<img src="' + it[2] + '?t=' + Date.now() + '" alt="' + it[1] + '">' +
-        "<p>" + it[1] + "</p></div>";
+        inner + "<p>" + it[1] + "</p></div>";
     }).join("");
     wrap.addEventListener("click", function (e) {
       var card = e.target.closest(".slot-card");
@@ -59,13 +62,14 @@
       wrap.querySelectorAll(".slot-card").forEach(function (c) {
         c.classList.toggle("elegida", c === card);
       });
+      document.getElementById("foto").accept = slot === "cancion" ? "audio/*" : "image/*";
     });
 
     document.getElementById("btnSubir").addEventListener("click", function () {
       var file = document.getElementById("foto").files[0];
       var pin = document.getElementById("pin").value;
       var estado = document.getElementById("estado");
-      if (!file) { estado.textContent = "Elige una imagen."; return; }
+      if (!file) { estado.textContent = slot === "cancion" ? "Elige un mp3." : "Elige una imagen."; return; }
       if (!pin) { estado.textContent = "Escribe el PIN."; return; }
       var data = new FormData();
       data.append("slot", slot);
@@ -77,8 +81,10 @@
         .then(function (res) {
           if (!res.ok) { estado.textContent = res.j.error || "No se pudo guardar."; return; }
           estado.textContent = res.j.mensaje || "Listo.";
-          var img = wrap.querySelector('[data-slot="' + slot + '"] img');
-          if (img) img.src = "/mome/fotos/" + (slot === "final" ? "final" : slot) + ".jpg?t=" + Date.now();
+          if (slot !== "cancion") {
+            var img = wrap.querySelector('[data-slot="' + slot + '"] img');
+            if (img) img.src = "/mome/fotos/" + (slot === "final" ? "final" : slot) + ".jpg?t=" + Date.now();
+          }
         })
         .catch(function () { estado.textContent = "Error de red. Inténtalo de nuevo."; });
     });

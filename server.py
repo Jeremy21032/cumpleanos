@@ -19,9 +19,11 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parent
 app = Flask(__name__, static_folder=None)
+app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024
 
 SLOTS = {str(i): f"mome/fotos/{i}.jpg" for i in range(1, 7)}
 SLOTS["final"] = "mome/fotos/final.jpg"
+SLOTS["cancion"] = "assets/cancion.mp3"
 BLOCKED = {
     "server.py",
     "requirements.txt",
@@ -87,7 +89,7 @@ def commit_file(path, data, message):
     }
     if sha:
         payload["sha"] = sha
-    put = requests.put(url, headers=headers, json=payload, timeout=60)
+    put = requests.put(url, headers=headers, json=payload, timeout=120)
     if put.status_code not in (200, 201):
         raise RuntimeError(f"GitHub PUT {put.status_code}: {put.text[:400]}")
     return put.json()
@@ -108,20 +110,32 @@ def api_foto():
     slot = (request.form.get("slot") or "").strip()
     path = SLOTS.get(slot)
     if not path:
-        return jsonify(error="Elige una foto (1–6 o final)"), 400
-    uploaded = request.files.get("foto")
+        return jsonify(error="Elige una foto (1–6 o final) o la canción"), 400
+    uploaded = request.files.get("foto") or request.files.get("file")
     if not uploaded or not uploaded.filename:
-        return jsonify(error="Sube una imagen"), 400
+        return jsonify(error="Sube un archivo"), 400
+    raw = uploaded.read()
     try:
-        jpeg = to_jpeg(uploaded.read())
-        commit_file(path, jpeg, f"Actualizar foto {slot} de Mome desde la web.")
+        if slot == "cancion":
+            name = (uploaded.filename or "").lower()
+            mime = (uploaded.mimetype or "")
+            if not (mime.startswith("audio/") or name.endswith((".mp3", ".m4a", ".ogg", ".wav", ".aac"))):
+                return jsonify(error="Sube un mp3 u otro audio"), 400
+            data = raw
+            msg = "Actualizar canción de Mome desde la web."
+        else:
+            data = to_jpeg(raw)
+            msg = f"Actualizar foto {slot} de Mome desde la web."
+        commit_file(path, data, msg)
     except Exception as exc:
         return jsonify(error=str(exc)), 502
-    # también deja el archivo en este contenedor para verse al instante
     dest = ROOT / path
     dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_bytes(jpeg)
-    return jsonify(ok=True, path=f"/{path}", mensaje="Listo. Render tardará ~1 minuto en el resto de servidores.")
+    dest.write_bytes(data)
+    extra = ""
+    if slot == "cancion":
+        extra = " La sorpresa usa /assets/cancion.mp3."
+    return jsonify(ok=True, path=f"/{path}", mensaje="Listo. Render tardará ~1 minuto; recarga /mome." + extra)
 
 
 @app.get("/mome/")

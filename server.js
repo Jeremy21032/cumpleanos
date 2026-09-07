@@ -18,16 +18,16 @@ const ROOT = __dirname;
 const PORT = Number(process.env.PORT || 10000);
 const REPO = process.env.GITHUB_REPO || "Jeremy21032/cumpleanos";
 const BRANCH = process.env.GITHUB_BRANCH || "main";
-const SLOTS = new Set(["1", "2", "3", "4", "5", "6", "final"]);
+const SLOTS = new Set(["1", "2", "3", "4", "5", "6", "final", "cancion"]);
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024, files: 1 },
   fileFilter: function (_req, file, cb) {
-    if (/^image\//.test(file.mimetype) || /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(file.originalname || "")) {
+    if (/^image\//.test(file.mimetype) || /^audio\//.test(file.mimetype) || /\.(jpe?g|png|gif|webp|heic|heif|mp3|m4a|ogg|wav)$/i.test(file.originalname || "")) {
       cb(null, true);
     } else {
-      cb(new Error("Solo se aceptan imágenes"));
+      cb(new Error("Solo se aceptan imágenes o audio"));
     }
   }
 });
@@ -41,7 +41,9 @@ function pinOk(input) {
 }
 
 function repoPathFor(slot) {
-  return slot === "final" ? "mome/fotos/final.jpg" : "mome/fotos/" + slot + ".jpg";
+  if (slot === "final") return "mome/fotos/final.jpg";
+  if (slot === "cancion") return "assets/cancion.mp3";
+  return "mome/fotos/" + slot + ".jpg";
 }
 
 async function githubJson(url, opts) {
@@ -128,16 +130,19 @@ app.post("/mome/api/foto", function (req, res) {
           throw e;
         }
         if (!req.file || !req.file.buffer) {
-          const e = new Error("Falta la imagen");
+          const e = new Error("Falta el archivo");
           e.status = 400;
           throw e;
         }
-        const jpeg = await sharp(req.file.buffer, { failOn: "none" })
-          .rotate()
-          .resize(1200, 1200, { fit: "inside", withoutEnlargement: true })
-          .jpeg({ quality: 82, mozjpeg: true })
-          .toBuffer();
-        await commitFoto(slot, jpeg);
+        var payload = req.file.buffer;
+        if (slot !== "cancion") {
+          payload = await sharp(req.file.buffer, { failOn: "none" })
+            .rotate()
+            .resize(1200, 1200, { fit: "inside", withoutEnlargement: true })
+            .jpeg({ quality: 82, mozjpeg: true })
+            .toBuffer();
+        }
+        await commitFoto(slot, payload);
         res.json({
           ok: true,
           slot: slot,

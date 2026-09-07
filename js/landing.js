@@ -43,9 +43,42 @@
   }
 
   var audioCtx = null;
+  var tema = null;
   function getCtx() {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume().catch(function () {});
     return audioCtx;
+  }
+  function urlCancion() {
+    var src = (C.cancion || "").trim();
+    if (!src) return "";
+    if (/^(https?:|blob:|data:|\/)/i.test(src)) return src;
+    return "/" + src.replace(/^\.?\//, "");
+  }
+  function prepararCancion() {
+    var src = urlCancion();
+    if (!src) return;
+    getCtx();
+    if (!tema) {
+      tema = new Audio(src);
+      tema.preload = "auto";
+      tema.volume = 0.65;
+      tema.loop = true;
+      try { tema.currentTime = Number(C.cancionInicio || 0); } catch (e) {}
+    }
+    var p = tema.play();
+    if (p && p.catch) {
+      p.catch(function (err) {
+        console.warn("No se pudo reproducir la canción", err);
+      });
+    }
+  }
+  function reproducirCancion() {
+    if (!urlCancion()) {
+      console.warn("No hay canción en CONFIG");
+      return;
+    }
+    prepararCancion();
   }
   function tone(freq, start, dur, vol) {
     var c = getCtx();
@@ -81,14 +114,7 @@
   function abrirLanding() {
     document.getElementById("intro").style.display = "none";
     document.getElementById("landing").style.display = "block";
-    try {
-      if (C.cancion) {
-        var cancion = new Audio(C.cancion);
-        cancion.currentTime = Number(C.cancionInicio || 0);
-        cancion.volume = 0.65;
-        cancion.play().catch(function () {});
-      }
-    } catch (e) {}
+    reproducirCancion();
     setTimeout(function () {
       var f = document.getElementById("flashLayer");
       if (f) f.style.opacity = "0";
@@ -117,7 +143,7 @@
 
     heart.addEventListener("click", function () {
       if (abriendo || clickCount >= TOTAL_CLICKS) return;
-      getCtx();
+      prepararCancion();
       clickCount++;
       var nivel = (clickCount / TOTAL_CLICKS) * 100;
       barra.style.width = nivel + "%";
@@ -132,6 +158,7 @@
 
       if (clickCount >= TOTAL_CLICKS) {
         abriendo = true;
+        reproducirCancion();
         setTimeout(abrirLanding, 450);
       }
     });

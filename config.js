@@ -38,6 +38,6 @@ window.CONFIG = {
   // Cualquier cantidad (1–12). El polaroid y los puntos se adaptan solos.
   fotos: ["fotos/1.svg", "fotos/2.svg", "fotos/3.svg"],
   fotoFinal: "fotos/final.svg",
-  cancion: "assets/cancion.mp3",
+  cancion: "/assets/cancion.mp3",
   cancionInicio: 0
 };
