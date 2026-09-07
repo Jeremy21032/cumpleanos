@@ -47,10 +47,15 @@
     else finalSlot.innerHTML = "<span>Foto final</span>";
 
     var addBtn = document.getElementById("btnAddFoto");
-    addBtn.disabled = fotos.length >= MAX_FOTOS;
-    addBtn.textContent = fotos.length >= MAX_FOTOS
-      ? "Máximo " + MAX_FOTOS + " fotos"
-      : "Añadir fotos";
+    if (fotos.length >= MAX_FOTOS && fotos.every(function (src) { return !esPlaceholder(src); })) {
+      addBtn.textContent = "Máximo " + MAX_FOTOS + " fotos";
+      addBtn.style.opacity = "0.5";
+      addBtn.style.pointerEvents = "none";
+    } else {
+      addBtn.textContent = "Añadir fotos";
+      addBtn.style.opacity = "";
+      addBtn.style.pointerEvents = "";
+    }
   }
 
   pintarFotos();
@@ -73,7 +78,9 @@
   });
 
   function esPlaceholder(src) {
-    return !src || src.indexOf("data:") !== 0;
+    if (!src) return true;
+    if (src.indexOf("data:") === 0 || src.indexOf("blob:") === 0) return false;
+    return true;
   }
 
   function avisoFotos(texto) {
@@ -81,10 +88,26 @@
     if (el) el.textContent = texto;
   }
 
+  function aplicarUrls(urls, reemplazarIndice) {
+    urls = (urls || []).filter(Boolean);
+    if (!urls.length) return;
+    if (reemplazarIndice != null && urls.length === 1) {
+      fotos[reemplazarIndice] = urls[0];
+    } else if (fotos.every(esPlaceholder)) {
+      fotos = urls.slice();
+    } else {
+      urls.forEach(function (url) {
+        var vacio = fotos.findIndex(esPlaceholder);
+        if (vacio >= 0) fotos[vacio] = url;
+        else if (fotos.length < MAX_FOTOS) fotos.push(url);
+      });
+    }
+    if (fotos.length > MAX_FOTOS) fotos = fotos.slice(0, MAX_FOTOS);
+    pintarFotos();
+  }
+
   function agregarArchivos(fileList, reemplazarIndice) {
-    var files = Array.prototype.slice.call(fileList || []).filter(function (f) {
-      return f && (/^image\//.test(f.type) || /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(f.name) || !f.type);
-    });
+    var files = Array.prototype.slice.call(fileList || []);
     if (!files.length) {
       avisoFotos("No se pudieron leer las imágenes. Vuelve a elegirlas.");
       return Promise.resolve();
@@ -94,54 +117,48 @@
     if (reemplazarIndice != null && !esPlaceholder(fotos[reemplazarIndice])) hueco += 1;
     if (hueco <= 0) {
       avisoFotos("Ya tienes " + MAX_FOTOS + " fotos.");
-      pintarFotos();
       return Promise.resolve();
     }
     files = files.slice(0, hueco);
     avisoFotos("Cargando " + files.length + " foto" + (files.length === 1 ? "" : "s") + "…");
 
+    var blobs = files.map(function (file) { return URL.createObjectURL(file); });
+    aplicarUrls(blobs, reemplazarIndice);
+
     return Promise.all(files.map(function (file) {
-      return ConfigStore.compressImage(file).catch(function (err) {
-        console.error(err);
+      return ConfigStore.compressImage(file).catch(function () {
         return ConfigStore.fileToDataURL(file);
       });
     })).then(function (urls) {
       urls = urls.filter(Boolean);
-      if (!urls.length) throw new Error("Ninguna imagen se pudo abrir");
-      if (reemplazarIndice != null && urls.length === 1) {
-        fotos[reemplazarIndice] = urls[0];
-      } else if (fotos.every(esPlaceholder)) {
-        fotos = urls.slice();
-      } else {
-        urls.forEach(function (url) {
-          var vacio = fotos.findIndex(function (src) { return !src; });
-          if (vacio >= 0) fotos[vacio] = url;
-          else fotos.push(url);
-        });
-      }
-      if (fotos.length > MAX_FOTOS) fotos = fotos.slice(0, MAX_FOTOS);
+      blobs.forEach(function (blob, i) {
+        var pos = fotos.indexOf(blob);
+        if (pos >= 0 && urls[i]) {
+          fotos[pos] = urls[i];
+          URL.revokeObjectURL(blob);
+        }
+      });
       pintarFotos();
+      try { ConfigStore.save(recoger().data); } catch (e) {}
       avisoFotos(fotos.filter(function (s) { return !esPlaceholder(s); }).length + " fotos en el polaroid. Hasta 12.");
     }).catch(function (err) {
       console.error(err);
       avisoFotos("No se pudieron cargar las fotos. Prueba otra vez.");
-      alert("No se pudieron cargar las fotos: " + ((err && err.message) || err));
     });
   }
 
   document.getElementById("filePolaroid").addEventListener("change", function (e) {
     var lista = Array.prototype.slice.call(e.target.files || []);
     var indice = slotActivo;
-    e.target.value = "";
     slotActivo = null;
     if (!lista.length) return;
-    agregarArchivos(lista, indice);
+    agregarArchivos(lista, indice).then(function () {
+      e.target.value = "";
+    });
   });
 
   document.getElementById("btnAddFoto").addEventListener("click", function () {
-    if (fotos.length >= MAX_FOTOS && fotos.every(function (src) { return !esPlaceholder(src); })) return;
     slotActivo = null;
-    document.getElementById("filePolaroid").click();
   });
 
   document.getElementById("slotFinal").addEventListener("click", function () {

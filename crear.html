@@ -37,10 +37,10 @@
     <label>Fotos del polaroid</label>
     <div class="fotos-grid" id="fotosGrid"></div>
     <div class="fotos-acciones">
-      <button type="button" class="btn-foto" id="btnAddFoto">Añadir fotos</button>
+      <label class="btn-foto" for="filePolaroid" id="btnAddFoto">Añadir fotos</label>
     </div>
     <p class="aviso" id="fotosAviso">Elige varias a la vez (Mayús, ⌘ o “Seleccionar todo”). Hasta 12 fotos.</p>
-    <input id="filePolaroid" type="file" accept="image/*" multiple hidden>
+    <input id="filePolaroid" class="file-oculto" type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif,.heic,.heif" multiple>
 
     <label for="carta">Carta</label>
     <textarea id="carta"></textarea>

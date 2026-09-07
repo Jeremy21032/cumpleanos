@@ -98,7 +98,8 @@ body { font-family: 'Lora', Georgia, serif; background: #faf7f2; color: #2c2218;
 .foto-slot.wide img { height: 180px; }
 .editor button.foto-quitar { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; padding: 0; border-radius: 50%; background: rgba(155,90,58,0.92); color: #fff; font-size: 15px; line-height: 26px; z-index: 2; font-style: normal; font-family: Georgia, serif; }
 .fotos-acciones { margin-top: 10px; }
-.editor button.btn-foto { background: transparent; color: #9b7a52; border: 1px solid rgba(155,122,82,0.4); padding: 10px 18px; font-size: 14px; width: 100%; }
+.editor label.btn-foto, .editor button.btn-foto { display: block; text-align: center; background: transparent; color: #9b7a52; border: 1px solid rgba(155,122,82,0.4); padding: 10px 18px; font-size: 14px; width: 100%; cursor: pointer; font-family: 'Playfair Display', serif; font-style: italic; border-radius: 24px; }
+.file-oculto { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; opacity: 0; }
 .editor .acciones { display: flex; flex-direction: column; gap: 10px; margin-top: 28px; }
 .editor button, .editor a.btn { display: block; text-align: center; text-decoration: none; background: linear-gradient(135deg,#c0785a,#9b5a3a); color: #fff; border: none; padding: 14px 26px; border-radius: 24px; font-family: 'Playfair Display', serif; font-style: italic; font-size: 16px; cursor: pointer; }
 .editor button.secundario { background: transparent; color: #9b7a52; border: 1px solid rgba(155,122,82,0.4); }
