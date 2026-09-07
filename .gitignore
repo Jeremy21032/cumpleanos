@@ -1,5 +1,6 @@
 .DS_Store
 .preview/
 *.log
+__pycache__/
 node_modules/
 .env

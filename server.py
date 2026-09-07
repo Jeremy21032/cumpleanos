@@ -10,7 +10,9 @@ Opcional:
 import base64
 import hmac
 import io
+import json
 import os
+import re
 from pathlib import Path
 
 import requests
@@ -21,9 +23,11 @@ ROOT = Path(__file__).resolve().parent
 app = Flask(__name__, static_folder=None)
 app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024
 
-SLOTS = {str(i): f"mome/fotos/{i}.jpg" for i in range(1, 7)}
+SLOTS = {str(i): f"mome/fotos/{i}.jpg" for i in range(1, 13)}
 SLOTS["final"] = "mome/fotos/final.jpg"
 SLOTS["cancion"] = "assets/cancion.mp3"
+CONFIG_PATH = "mome/config.js"
+MAX_POLAROIDS = 12
 BLOCKED = {
     "server.py",
     "requirements.txt",
@@ -95,10 +99,67 @@ def commit_file(path, data, message):
     return put.json()
 
 
+def github_get_bytes(path):
+    repo = env("GITHUB_REPO", "Jeremy21032/cumpleanos")
+    branch = env("GITHUB_BRANCH", "main")
+    headers = github_headers()
+    if not headers:
+        raise RuntimeError("Falta GITHUB_TOKEN en Render")
+    url = f"https://api.github.com/repos/{repo}/contents/{path}"
+    current = requests.get(url, headers=headers, params={"ref": branch}, timeout=30)
+    if current.status_code != 200:
+        raise RuntimeError(f"GitHub GET {current.status_code}: {current.text[:300]}")
+    body = current.json()
+    raw = base64.b64decode(body.get("content") or "")
+    return raw, body.get("sha")
+
+
+def parse_config(text):
+    match = re.search(r"window\.CONFIG\s*=\s*(\{.*\});", text, re.S)
+    if not match:
+        raise RuntimeError("No se pudo leer mome/config.js")
+    return json.loads(match.group(1))
+
+
+def dump_config(cfg):
+    header = "/* Página de Mome. Para cambiar una foto: reemplaza el jpg en mome/fotos/ y haz git push. */\n"
+    return header + "window.CONFIG = " + json.dumps(cfg, ensure_ascii=False, indent=2) + ";\n"
+
+
+def polaroid_nums(fotos):
+    nums = []
+    for src in fotos or []:
+        match = re.search(r"/(\d+)\.jpe?g$", str(src), re.I)
+        if match:
+            nums.append(int(match.group(1)))
+    return nums
+
+
+def load_config_local():
+    text = (ROOT / CONFIG_PATH).read_text(encoding="utf-8")
+    return parse_config(text)
+
+
 @app.get("/mome/editar")
 @app.get("/mome/editar.html")
 def editor():
     return send_from_directory(ROOT / "mome", "editar.html")
+
+
+@app.get("/mome/api/estado")
+def api_estado():
+    try:
+        cfg = load_config_local()
+    except Exception:
+        cfg = {"fotos": []}
+    fotos = list(cfg.get("fotos") or [])
+    return jsonify(
+        ok=True,
+        fotos=fotos,
+        fotoFinal=cfg.get("fotoFinal") or "/mome/fotos/final.jpg",
+        max=MAX_POLAROIDS,
+        siguiente= (max(polaroid_nums(fotos)) + 1) if polaroid_nums(fotos) else 1,
+    )
 
 
 @app.post("/mome/api/foto")
@@ -108,14 +169,42 @@ def api_foto():
     if not pin_ok(request.form.get("pin", "")):
         return jsonify(error="PIN incorrecto"), 401
     slot = (request.form.get("slot") or "").strip()
-    path = SLOTS.get(slot)
-    if not path:
-        return jsonify(error="Elige una foto (1–6 o final) o la canción"), 400
     uploaded = request.files.get("foto") or request.files.get("file")
     if not uploaded or not uploaded.filename:
         return jsonify(error="Sube un archivo"), 400
     raw = uploaded.read()
     try:
+        if slot in ("nueva", "add", "anadir"):
+            cfg_raw, _sha = github_get_bytes(CONFIG_PATH)
+            cfg = parse_config(cfg_raw.decode("utf-8"))
+            nums = polaroid_nums(cfg.get("fotos"))
+            next_n = (max(nums) + 1) if nums else 1
+            if next_n > MAX_POLAROIDS:
+                return jsonify(error="Ya hay %s polaroids (máximo)." % MAX_POLAROIDS), 400
+            slot = str(next_n)
+            path = f"mome/fotos/{slot}.jpg"
+            data = to_jpeg(raw)
+            commit_file(path, data, f"Añadir polaroid {slot} de Mome desde la web.")
+            url = f"/mome/fotos/{slot}.jpg"
+            fotos = list(cfg.get("fotos") or [])
+            if url not in fotos:
+                fotos.append(url)
+                cfg["fotos"] = fotos
+                commit_file(CONFIG_PATH, dump_config(cfg).encode("utf-8"), f"Incluir polaroid {slot} en /mome.")
+            dest = ROOT / path
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(data)
+            (ROOT / CONFIG_PATH).write_text(dump_config(cfg), encoding="utf-8")
+            return jsonify(
+                ok=True,
+                slot=slot,
+                path=url,
+                mensaje="Foto %s añadida. Espera ~1 minuto y recarga /mome." % slot,
+            )
+
+        path = SLOTS.get(slot)
+        if not path:
+            return jsonify(error="Elige una foto (1–12 o final) o la canción"), 400
         if slot == "cancion":
             name = (uploaded.filename or "").lower()
             mime = (uploaded.mimetype or "")
@@ -132,10 +221,8 @@ def api_foto():
     dest = ROOT / path
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_bytes(data)
-    extra = ""
-    if slot == "cancion":
-        extra = " La sorpresa usa /assets/cancion.mp3."
-    return jsonify(ok=True, path=f"/{path}", mensaje="Listo. Render tardará ~1 minuto; recarga /mome." + extra)
+    extra = " La sorpresa usa /assets/cancion.mp3." if slot == "cancion" else ""
+    return jsonify(ok=True, path=f"/{path}", slot=slot, mensaje="Listo. Render tardará ~1 minuto; recarga /mome." + extra)
 
 
 @app.get("/mome/")

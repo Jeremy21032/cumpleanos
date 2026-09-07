@@ -12,49 +12,76 @@
     .slot-card img { width: 100%; height: 120px; object-fit: cover; display: block; }
     .slot-card p { font-size: 12px; text-align: center; padding: 8px; color: #9b7a52; }
     .slot-card.elegida { outline: 2px solid #c0785a; }
+    .slot-card.icono { min-height: 120px; display: flex; flex-direction: column; }
+    .slot-card.icono .glyph { height: 120px; display: flex; align-items: center; justify-content: center; font-size: 42px; }
     .estado { min-height: 1.4em; color: #9b7a52; font-style: italic; text-align: center; margin-top: 14px; }
   </style>
 </head>
 <body>
   <div class="editor">
     <h1>Fotos de Mome</h1>
-    <p class="lead">Cambia una imagen aquí. El link de la sorpresa se actualiza solo; no hace falta GitHub.</p>
+    <p class="lead">Cambia una foto, añade otra al polaroid o sube la canción. No hace falta GitHub.</p>
 
-    <label>Qué foto quieres cambiar</label>
+    <label>Qué quieres cambiar</label>
     <div class="slots" id="slots"></div>
 
-    <label for="foto">Nueva imagen</label>
+    <label for="foto">Archivo nuevo</label>
     <input id="foto" type="file" accept="image/*">
 
     <label for="pin">PIN</label>
     <input id="pin" type="password" autocomplete="current-password" placeholder="El que pusiste en Render">
 
     <div class="acciones">
-      <button type="button" id="btnSubir">Guardar foto</button>
-      <a class="btn" href="/mome/" style="background:transparent;color:#9b7a52;border:1px solid rgba(155,122,82,0.4)">Ver la sorpresa</a>
+      <button type="button" id="btnSubir">Guardar</button>
+      <button type="button" class="secundario" id="btnAnadir">Añadir foto</button>
+      <a class="btn secundario" href="/mome/">Ver la sorpresa</a>
     </div>
-    <p class="estado" id="estado"></p>
+    <p class="estado" id="estado">Para sumar una al polaroid: Añadir foto → elige la imagen → PIN → Guardar. Espera ~1 minuto y recarga /mome.</p>
   </div>
   <script>
     var slot = "1";
     var wrap = document.getElementById("slots");
-    var items = [
-      ["1", "Polaroid 1", "/mome/fotos/1.jpg"],
-      ["2", "Polaroid 2", "/mome/fotos/2.jpg"],
-      ["3", "Polaroid 3", "/mome/fotos/3.jpg"],
-      ["4", "Polaroid 4", "/mome/fotos/4.jpg"],
-      ["5", "Polaroid 5", "/mome/fotos/5.jpg"],
-      ["6", "Polaroid 6", "/mome/fotos/6.jpg"],
-      ["final", "Foto final", "/mome/fotos/final.jpg"],
-      ["cancion", "Canción", ""]
-    ];
-    wrap.innerHTML = items.map(function (it, i) {
-      var inner = it[0] === "cancion"
-        ? '<div style="height:120px;display:flex;align-items:center;justify-content:center;font-size:42px">♪</div>'
-        : '<img src="' + it[2] + '?t=' + Date.now() + '" alt="' + it[1] + '">';
-      return '<div class="slot-card' + (i === 0 ? " elegida" : "") + '" data-slot="' + it[0] + '">' +
-        inner + "<p>" + it[1] + "</p></div>";
-    }).join("");
+    var estado = document.getElementById("estado");
+    var btnAnadir = document.getElementById("btnAnadir");
+    var siguiente = 7;
+    var maxFotos = 12;
+
+    function pintarSlots(fotos) {
+      fotos = fotos || [];
+      var items = fotos.map(function (src, i) {
+        var n = String(i + 1);
+        var m = src.match(/\/(\d+)\.jpe?g$/i);
+        if (m) n = m[1];
+        return [n, "Polaroid " + n, src];
+      });
+      items.push(["final", "Foto final", "/mome/fotos/final.jpg"]);
+      items.push(["cancion", "Canción", ""]);
+      wrap.innerHTML = items.map(function (it, i) {
+        var inner = it[0] === "cancion"
+          ? '<div class="glyph">♪</div>'
+          : '<img src="' + it[2] + '?t=' + Date.now() + '" alt="' + it[1] + '">';
+        var extra = it[0] === "cancion" ? " icono" : "";
+        return '<div class="slot-card' + extra + (i === 0 ? " elegida" : "") + '" data-slot="' + it[0] + '">' +
+          inner + "<p>" + it[1] + "</p></div>";
+      }).join("");
+      slot = items[0] ? items[0][0] : "1";
+      var lleno = siguiente > maxFotos;
+      btnAnadir.disabled = lleno;
+      btnAnadir.textContent = lleno ? "Máximo 12 fotos" : "Añadir foto";
+    }
+
+    function cargarEstado() {
+      return fetch("/mome/api/estado")
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          maxFotos = j.max || 12;
+          siguiente = j.siguiente || ((j.fotos || []).length + 1);
+          pintarSlots(j.fotos);
+        })
+        .catch(function () { pintarSlots(["/mome/fotos/1.jpg","/mome/fotos/2.jpg","/mome/fotos/3.jpg","/mome/fotos/4.jpg","/mome/fotos/5.jpg","/mome/fotos/6.jpg"]); });
+    }
+    cargarEstado();
+
     wrap.addEventListener("click", function (e) {
       var card = e.target.closest(".slot-card");
       if (!card) return;
@@ -63,12 +90,26 @@
         c.classList.toggle("elegida", c === card);
       });
       document.getElementById("foto").accept = slot === "cancion" ? "audio/*" : "image/*";
+      estado.textContent = slot === "nueva"
+        ? "Va a ser la polaroid " + siguiente + ". Elige la imagen, pon el PIN y Guardar."
+        : "Reemplaza esta y pulsa Guardar.";
+    });
+
+    btnAnadir.addEventListener("click", function () {
+      if (siguiente > maxFotos) {
+        estado.textContent = "Ya hay 12 polaroids (máximo).";
+        return;
+      }
+      slot = "nueva";
+      wrap.querySelectorAll(".slot-card").forEach(function (c) { c.classList.remove("elegida"); });
+      document.getElementById("foto").accept = "image/*";
+      document.getElementById("foto").click();
+      estado.textContent = "Nueva polaroid (será la " + siguiente + "). Elige la imagen, PIN y Guardar.";
     });
 
     document.getElementById("btnSubir").addEventListener("click", function () {
       var file = document.getElementById("foto").files[0];
       var pin = document.getElementById("pin").value;
-      var estado = document.getElementById("estado");
       if (!file) { estado.textContent = slot === "cancion" ? "Elige un mp3." : "Elige una imagen."; return; }
       if (!pin) { estado.textContent = "Escribe el PIN."; return; }
       var data = new FormData();
@@ -80,11 +121,10 @@
         .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
         .then(function (res) {
           if (!res.ok) { estado.textContent = res.j.error || "No se pudo guardar."; return; }
-          estado.textContent = res.j.mensaje || "Listo.";
-          if (slot !== "cancion") {
-            var img = wrap.querySelector('[data-slot="' + slot + '"] img');
-            if (img) img.src = "/mome/fotos/" + (slot === "final" ? "final" : slot) + ".jpg?t=" + Date.now();
-          }
+          estado.textContent = res.j.mensaje || "Listo. Espera ~1 minuto y recarga /mome.";
+          document.getElementById("foto").value = "";
+          slot = "1";
+          cargarEstado();
         })
         .catch(function () { estado.textContent = "Error de red. Inténtalo de nuevo."; });
     });
