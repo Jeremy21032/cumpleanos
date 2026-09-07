@@ -4,9 +4,16 @@ server {
     server_name _;
     root /usr/share/nginx/html;
     index index.html;
+    absolute_redirect off;
+    port_in_redirect off;
 
     location = /mome {
         return 301 /mome/;
+    }
+
+    location ^~ /mome/fotos/ {
+        expires -1;
+        add_header Cache-Control "no-cache, must-revalidate";
     }
 
     location /mome/ {
