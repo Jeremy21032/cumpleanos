@@ -4,7 +4,7 @@
   var fotos = (C.fotos && C.fotos.length ? C.fotos.slice() : [""]);
   if (!fotos.length) fotos = [""];
   var fotoFinal = C.fotoFinal || "";
-  var slotActivo = 0;
+  var slotActivo = null;
 
   function val(id) { return document.getElementById(id).value; }
   function set(id, value) {
@@ -50,7 +50,7 @@
     addBtn.disabled = fotos.length >= MAX_FOTOS;
     addBtn.textContent = fotos.length >= MAX_FOTOS
       ? "Máximo " + MAX_FOTOS + " fotos"
-      : "Añadir otra foto";
+      : "Añadir fotos";
   }
 
   pintarFotos();
@@ -72,20 +72,56 @@
     document.getElementById("filePolaroid").click();
   });
 
-  document.getElementById("filePolaroid").addEventListener("change", function (e) {
-    var file = e.target.files && e.target.files[0];
-    e.target.value = "";
-    if (!file) return;
-    ConfigStore.compressImage(file).then(function (dataUrl) {
-      fotos[slotActivo] = dataUrl;
+  function esPlaceholder(src) {
+    return !src || src.indexOf("data:") !== 0;
+  }
+
+  function agregarArchivos(fileList, reemplazarIndice) {
+    var files = Array.prototype.slice.call(fileList || []).filter(function (f) {
+      return f && (/^image\//.test(f.type) || /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(f.name));
+    });
+    if (!files.length) return Promise.resolve();
+
+    var hueco = MAX_FOTOS - fotos.filter(function (src) { return !esPlaceholder(src); }).length;
+    if (reemplazarIndice != null && !esPlaceholder(fotos[reemplazarIndice])) hueco += 1;
+    if (hueco <= 0) {
+      pintarFotos();
+      return Promise.resolve();
+    }
+    files = files.slice(0, hueco);
+
+    return Promise.all(files.map(function (file) {
+      return ConfigStore.compressImage(file);
+    })).then(function (urls) {
+      if (reemplazarIndice != null && urls.length === 1) {
+        fotos[reemplazarIndice] = urls[0];
+      } else if (fotos.every(esPlaceholder)) {
+        fotos = urls.slice();
+      } else {
+        urls.forEach(function (url) {
+          var vacio = fotos.findIndex(function (src) { return !src; });
+          if (vacio >= 0) fotos[vacio] = url;
+          else fotos.push(url);
+        });
+      }
+      if (fotos.length > MAX_FOTOS) fotos = fotos.slice(0, MAX_FOTOS);
       pintarFotos();
     });
+  }
+
+  document.getElementById("filePolaroid").addEventListener("change", function (e) {
+    var lista = e.target.files;
+    var indice = slotActivo;
+    e.target.value = "";
+    slotActivo = null;
+    if (!lista || !lista.length) return;
+    agregarArchivos(lista, indice);
   });
 
   document.getElementById("btnAddFoto").addEventListener("click", function () {
-    if (fotos.length >= MAX_FOTOS) return;
-    fotos.push("");
-    pintarFotos();
+    if (fotos.length >= MAX_FOTOS && fotos.every(function (src) { return !esPlaceholder(src); })) return;
+    slotActivo = null;
+    document.getElementById("filePolaroid").click();
   });
 
   document.getElementById("slotFinal").addEventListener("click", function () {
