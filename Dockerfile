@@ -1,12 +1,8 @@
-FROM nginx:1.27-alpine
-
-COPY nginx.conf.template /etc/nginx/templates/default.conf.template
-COPY index.html crear.html config.js /usr/share/nginx/html/
-COPY css /usr/share/nginx/html/css
-COPY js /usr/share/nginx/html/js
-COPY fotos /usr/share/nginx/html/fotos
-COPY assets /usr/share/nginx/html/assets
-COPY mome /usr/share/nginx/html/mome
-
+FROM node:20-bookworm-slim
+WORKDIR /app
+COPY package.json ./
+RUN npm install --omit=dev
+COPY . .
 ENV PORT=10000
 EXPOSE 10000
+CMD ["node", "server.js"]

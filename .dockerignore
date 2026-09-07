@@ -3,3 +3,5 @@
 .DS_Store
 .preview
 *.md
+node_modules
+.env

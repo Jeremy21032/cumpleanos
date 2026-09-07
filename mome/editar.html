@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cambiar fotos de Mome</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="editor">
+    <h1>Fotos de Mome</h1>
+    <p class="lead">Cambia una foto de la sorpresa. GitHub queda en segundo plano: Render se actualiza solo.</p>
+
+    <form id="formFoto">
+      <label for="slot">Qué foto cambiar</label>
+      <select id="slot" name="slot" required>
+        <option value="1">Polaroid 1</option>
+        <option value="2">Polaroid 2</option>
+        <option value="3">Polaroid 3</option>
+        <option value="4">Polaroid 4</option>
+        <option value="5">Polaroid 5</option>
+        <option value="6">Polaroid 6</option>
+        <option value="final">Foto final</option>
+      </select>
+
+      <label>Foto actual</label>
+      <div class="fotos-grid">
+        <div class="foto-slot wide" id="previewWrap">
+          <img id="preview" src="/mome/fotos/1.jpg" alt="Foto actual">
+        </div>
+      </div>
+
+      <label for="file">Nueva imagen</label>
+      <input id="file" name="file" type="file" accept="image/*" required>
+
+      <label for="pin">PIN</label>
+      <input id="pin" name="pin" type="password" inputmode="numeric" autocomplete="off" required>
+
+      <div class="acciones">
+        <button type="submit" id="btnEnviar">Guardar en la web</button>
+        <a class="btn secundario" href="/mome/">Ver la sorpresa</a>
+      </div>
+    </form>
+    <p class="aviso" id="aviso">Después de guardar, espera ~1 minuto y recarga /mome.</p>
+  </div>
+
+  <script>
+    (function () {
+      var slot = document.getElementById("slot");
+      var preview = document.getElementById("preview");
+      var aviso = document.getElementById("aviso");
+      var btn = document.getElementById("btnEnviar");
+
+      function srcActual() {
+        return slot.value === "final" ? "/mome/fotos/final.jpg" : "/mome/fotos/" + slot.value + ".jpg";
+      }
+      function pintar() {
+        preview.src = srcActual() + "?t=" + Date.now();
+      }
+      slot.addEventListener("change", pintar);
+
+      document.getElementById("formFoto").addEventListener("submit", function (e) {
+        e.preventDefault();
+        var data = new FormData();
+        data.append("slot", slot.value);
+        data.append("pin", document.getElementById("pin").value);
+        var file = document.getElementById("file").files[0];
+        if (!file) {
+          aviso.textContent = "Elige una imagen.";
+          return;
+        }
+        data.append("file", file);
+        btn.disabled = true;
+        btn.textContent = "Guardando…";
+        aviso.textContent = "Subiendo al servidor…";
+        fetch("/mome/api/foto", { method: "POST", body: data })
+          .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+          .then(function (res) {
+            if (!res.ok || !res.j.ok) throw new Error((res.j && res.j.error) || "No se pudo guardar");
+            aviso.textContent = "Listo. Render tardará ~1 minuto; recarga /mome.";
+            document.getElementById("file").value = "";
+          })
+          .catch(function (err) {
+            aviso.textContent = err.message || "Error";
+          })
+          .then(function () {
+            btn.disabled = false;
+            btn.textContent = "Guardar en la web";
+          });
+      });
+    })();
+  </script>
+</body>
+</html>
