@@ -54,12 +54,18 @@ def pin_ok(got):
     return hmac.compare_digest(got_b, exp_b)
 
 
-def to_jpeg(raw):
+def to_jpeg(raw, square=False):
     img = Image.open(io.BytesIO(raw))
     if img.mode in ("RGBA", "P"):
         img = img.convert("RGB")
     elif img.mode != "RGB":
         img = img.convert("RGB")
+    if square:
+        width, height = img.size
+        side = min(width, height)
+        left = (width - side) // 2
+        top = (height - side) // 2
+        img = img.crop((left, top, left + side, top + side))
     img.thumbnail((1400, 1400))
     out = io.BytesIO()
     img.save(out, format="JPEG", quality=82, optimize=True)
@@ -292,7 +298,7 @@ def api_foto():
                 return jsonify(error="Ya hay %s polaroids (máximo)." % MAX_POLAROIDS), 400
             slot = str(next_n)
             path = f"mome/fotos/{slot}.jpg"
-            data = to_jpeg(raw)
+            data = to_jpeg(raw, square=True)
             commit_file(path, data, f"Añadir polaroid {slot} de Mome desde la web.")
             url = f"/mome/fotos/{slot}.jpg"
             fotos = list(cfg.get("fotos") or [])
@@ -322,7 +328,7 @@ def api_foto():
             data = raw
             msg = "Actualizar canción de Mome desde la web."
         else:
-            data = to_jpeg(raw)
+            data = to_jpeg(raw, square=(slot != "final"))
             msg = f"Actualizar foto {slot} de Mome desde la web."
         commit_file(path, data, msg)
     except Exception as exc:

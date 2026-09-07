@@ -21,6 +21,12 @@
     .hint { font-size: 13px; color: #b0a08a; font-style: italic; margin: 0 0 8px; }
     .qr-box { text-align: center; }
     .qr-box img { width: 220px; height: 220px; background: #fff; padding: 10px; border-radius: 12px; border: 1px solid rgba(160,120,70,0.28); margin: 8px auto 12px; display: block; }
+    .crop-box { margin: 18px 0 8px; }
+    .crop-box.oculto { display: none; }
+    .crop-polaroid { background: #fff; padding: 12px; width: 280px; margin: 0 auto 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+    .crop-stage { width: 256px; height: 256px; overflow: hidden; position: relative; background: #e8e0d4; touch-action: none; cursor: grab; border-radius: 2px; }
+    .crop-stage:active { cursor: grabbing; }
+    .crop-stage img { position: absolute; left: 0; top: 0; max-width: none; transform-origin: 0 0; user-select: none; pointer-events: none; }
   </style>
 </head>
 <body>
@@ -31,8 +37,18 @@
     <label>Qué archivo quieres cambiar</label>
     <div class="slots" id="slots"></div>
 
-    <label for="foto">Archivo nuevo</label>
+    <label for="foto">Archivo nuevo (opcional)</label>
     <input id="foto" type="file" accept="image/*">
+
+    <div id="cropBox" class="crop-box oculto">
+      <label>Encuadre del polaroid</label>
+      <p class="hint">Arrastra el recuadro para elegir la cara o la zona. El cuadrado es el mismo de /mome. Usa el zoom si quieres acercar.</p>
+      <div class="crop-polaroid">
+        <div class="crop-stage" id="cropStage"><img id="cropImg" alt="Encuadre"></div>
+      </div>
+      <label for="cropZoom">Zoom</label>
+      <input id="cropZoom" type="range" min="0" max="100" value="0">
+    </div>
 
     <label for="pin">PIN</label>
     <input id="pin" type="password" autocomplete="current-password" placeholder="El que pusiste en Render">
@@ -41,7 +57,7 @@
       <button type="button" id="btnSubir">Guardar archivo</button>
       <button type="button" class="secundario" id="btnAnadir">Añadir foto</button>
     </div>
-    <p class="estado" id="estado">Fotos: elige una miniatura o Añadir foto → archivo → PIN → Guardar archivo.</p>
+    <p class="estado" id="estado">Toca un polaroid para reencuadrar, o Añadir foto. Arrastra el cuadrado, PIN y Guardar archivo.</p>
 
     <div class="seccion">
       <h1>Textos</h1>
@@ -106,9 +122,17 @@
     var estado = document.getElementById("estado");
     var estadoTextos = document.getElementById("estadoTextos");
     var btnAnadir = document.getElementById("btnAnadir");
+    var cropBox = document.getElementById("cropBox");
+    var cropStage = document.getElementById("cropStage");
+    var cropImg = document.getElementById("cropImg");
+    var cropZoom = document.getElementById("cropZoom");
     var siguiente = 7;
     var maxFotos = 12;
+    var fotosActuales = [];
     var BR_IDS = ["titulo", "capitulo", "brindis", "fraseFinal"];
+    var SIZE = 256;
+    var OUT = 1200;
+    var crop = { ready: false, scale: 1, minScale: 1, maxScale: 1, x: 0, y: 0, drag: false, lastX: 0, lastY: 0, pinch: 0, pinchScale: 1, objectUrl: "" };
 
     function brToNl(s) {
       return String(s || "").replace(/<br\s*\/?>/gi, "\n");
@@ -117,10 +141,105 @@
       if (Array.isArray(v)) return v;
       return String(v || "").split(/\n/).map(function (x) { return x.trim(); }).filter(Boolean);
     }
+    function esPolaroid(s) {
+      return s === "nueva" || (/^\d+$/).test(s);
+    }
+    function srcDeSlot(s) {
+      if (!esPolaroid(s) || s === "nueva") return "";
+      var found = fotosActuales.filter(function (src) {
+        return new RegExp("/" + s + "\\.jpe?g$", "i").test(src);
+      })[0];
+      return found || ("/mome/fotos/" + s + ".jpg");
+    }
 
-    function pintarSlots(fotos) {
-      fotos = fotos || [];
-      var items = fotos.map(function (src, i) {
+    function pintarCrop() {
+      if (!crop.ready) return;
+      cropImg.style.transform = "translate(" + crop.x + "px," + crop.y + "px) scale(" + crop.scale + ")";
+      var t = crop.maxScale === crop.minScale ? 0 : ((crop.scale - crop.minScale) / (crop.maxScale - crop.minScale)) * 100;
+      cropZoom.value = String(Math.round(t));
+    }
+    function clampCrop() {
+      var w = cropImg.naturalWidth * crop.scale;
+      var h = cropImg.naturalHeight * crop.scale;
+      crop.x = Math.min(0, Math.max(SIZE - w, crop.x));
+      crop.y = Math.min(0, Math.max(SIZE - h, crop.y));
+    }
+    function setScale(next, cx, cy) {
+      next = Math.min(crop.maxScale, Math.max(crop.minScale, next));
+      var px = cx == null ? SIZE / 2 : cx;
+      var py = cy == null ? SIZE / 2 : cy;
+      var relX = (px - crop.x) / crop.scale;
+      var relY = (py - crop.y) / crop.scale;
+      crop.scale = next;
+      crop.x = px - relX * crop.scale;
+      crop.y = py - relY * crop.scale;
+      clampCrop();
+      pintarCrop();
+    }
+    function encajarCover() {
+      var nw = cropImg.naturalWidth;
+      var nh = cropImg.naturalHeight;
+      if (!nw || !nh) return;
+      cropImg.style.width = nw + "px";
+      cropImg.style.height = nh + "px";
+      crop.minScale = Math.max(SIZE / nw, SIZE / nh);
+      crop.maxScale = crop.minScale * 4;
+      crop.scale = crop.minScale;
+      crop.x = (SIZE - nw * crop.scale) / 2;
+      crop.y = (SIZE - nh * crop.scale) / 2;
+      crop.ready = true;
+      clampCrop();
+      pintarCrop();
+    }
+    function mostrarCrop(on) {
+      cropBox.classList.toggle("oculto", !on);
+    }
+    function cargarImagenCrop(src) {
+      crop.ready = false;
+      if (crop.objectUrl) {
+        URL.revokeObjectURL(crop.objectUrl);
+        crop.objectUrl = "";
+      }
+      cropImg.onload = function () {
+        encajarCover();
+        mostrarCrop(true);
+      };
+      cropImg.onerror = function () {
+        crop.ready = false;
+        estado.textContent = "No se pudo cargar la foto para encuadrar.";
+      };
+      cropImg.src = src;
+    }
+    function cargarCropArchivo(file) {
+      if (!file || !file.type || file.type.indexOf("image") !== 0) return;
+      if (crop.objectUrl) URL.revokeObjectURL(crop.objectUrl);
+      crop.objectUrl = URL.createObjectURL(file);
+      cargarImagenCrop(crop.objectUrl);
+    }
+    function exportarCuadrado() {
+      return new Promise(function (resolve, reject) {
+        if (!crop.ready) return reject(new Error("encuadre"));
+        var sx = Math.max(0, -crop.x / crop.scale);
+        var sy = Math.max(0, -crop.y / crop.scale);
+        var sw = Math.min(cropImg.naturalWidth - sx, SIZE / crop.scale);
+        var sh = Math.min(cropImg.naturalHeight - sy, SIZE / crop.scale);
+        var canvas = document.createElement("canvas");
+        canvas.width = OUT;
+        canvas.height = OUT;
+        var ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, OUT, OUT);
+        ctx.drawImage(cropImg, sx, sy, sw, sh, 0, 0, OUT, OUT);
+        canvas.toBlob(function (blob) {
+          if (!blob) reject(new Error("blob"));
+          else resolve(blob);
+        }, "image/jpeg", 0.86);
+      });
+    }
+
+    function pintarSlots(fotos, keepSlot) {
+      fotosActuales = fotos || [];
+      var items = fotosActuales.map(function (src, i) {
         var n = String(i + 1);
         var m = src.match(/\/(\d+)\.jpe?g$/i);
         if (m) n = m[1];
@@ -128,18 +247,25 @@
       });
       items.push(["final", "Foto final", "/mome/fotos/final.jpg"]);
       items.push(["cancion", "Canción", ""]);
-      wrap.innerHTML = items.map(function (it, i) {
+      if (!keepSlot) slot = items[0] ? items[0][0] : "1";
+      wrap.innerHTML = items.map(function (it) {
         var inner = it[0] === "cancion"
           ? '<div class="glyph">♪</div>'
           : '<img src="' + it[2] + '?t=' + Date.now() + '" alt="' + it[1] + '">';
         var extra = it[0] === "cancion" ? " icono" : "";
-        return '<div class="slot-card' + extra + (i === 0 ? " elegida" : "") + '" data-slot="' + it[0] + '">' +
+        var on = it[0] === slot ? " elegida" : "";
+        return '<div class="slot-card' + extra + on + '" data-slot="' + it[0] + '">' +
           inner + "<p>" + it[1] + "</p></div>";
       }).join("");
-      slot = items[0] ? items[0][0] : "1";
       var lleno = siguiente > maxFotos;
       btnAnadir.disabled = lleno;
       btnAnadir.textContent = lleno ? "Máximo 12 fotos" : "Añadir foto";
+      if (esPolaroid(slot) && slot !== "nueva") {
+        cargarImagenCrop(srcDeSlot(slot) + "?t=" + Date.now());
+        mostrarCrop(true);
+      } else if (slot !== "nueva") {
+        mostrarCrop(false);
+      }
     }
 
     function rellenarTextos(c) {
@@ -161,15 +287,15 @@
         : brToNl(c.carta);
     }
 
-    function cargarEstado() {
+    function cargarEstado(keepSlot) {
       return fetch("/mome/api/estado")
         .then(function (r) { return r.json(); })
         .then(function (j) {
           maxFotos = j.max || 12;
           siguiente = j.siguiente || ((j.fotos || []).length + 1);
-          pintarSlots(j.fotos);
+          pintarSlots(j.fotos, keepSlot);
         })
-        .catch(function () { pintarSlots(["/mome/fotos/1.jpg","/mome/fotos/2.jpg","/mome/fotos/3.jpg","/mome/fotos/4.jpg","/mome/fotos/5.jpg","/mome/fotos/6.jpg"]); });
+        .catch(function () { pintarSlots(["/mome/fotos/1.jpg","/mome/fotos/2.jpg","/mome/fotos/3.jpg","/mome/fotos/4.jpg","/mome/fotos/5.jpg","/mome/fotos/6.jpg"], keepSlot); });
     }
 
     function cargarTextos() {
@@ -191,10 +317,18 @@
       wrap.querySelectorAll(".slot-card").forEach(function (c) {
         c.classList.toggle("elegida", c === card);
       });
+      document.getElementById("foto").value = "";
       document.getElementById("foto").accept = slot === "cancion" ? "audio/*" : "image/*";
-      estado.textContent = slot === "nueva"
-        ? "Va a ser la polaroid " + siguiente + ". Elige la imagen, pon el PIN y Guardar archivo."
-        : "Reemplaza esta y pulsa Guardar archivo.";
+      if (esPolaroid(slot)) {
+        cargarImagenCrop(srcDeSlot(slot) + "?t=" + Date.now());
+        estado.textContent = "Arrastra el cuadrado para elegir qué se ve. PIN y Guardar archivo. O elige otra imagen arriba.";
+      } else {
+        crop.ready = false;
+        mostrarCrop(false);
+        estado.textContent = slot === "cancion"
+          ? "Elige un mp3 y pulsa Guardar archivo."
+          : "Foto final: elige una imagen y Guardar (sin recorte).";
+      }
     });
 
     btnAnadir.addEventListener("click", function () {
@@ -206,18 +340,78 @@
       wrap.querySelectorAll(".slot-card").forEach(function (c) { c.classList.remove("elegida"); });
       document.getElementById("foto").accept = "image/*";
       document.getElementById("foto").click();
-      estado.textContent = "Nueva polaroid (será la " + siguiente + "). Elige la imagen, PIN y Guardar archivo.";
+      estado.textContent = "Nueva polaroid (será la " + siguiente + "). Elige la imagen, encuadra, PIN y Guardar.";
     });
 
-    document.getElementById("btnSubir").addEventListener("click", function () {
-      var file = document.getElementById("foto").files[0];
+    document.getElementById("foto").addEventListener("change", function () {
+      var file = this.files[0];
+      if (!file) return;
+      if (esPolaroid(slot)) {
+        cargarCropArchivo(file);
+        estado.textContent = "Arrastra el cuadrado para elegir qué se ve. Luego PIN y Guardar archivo.";
+      } else {
+        mostrarCrop(false);
+      }
+    });
+
+    cropZoom.addEventListener("input", function () {
+      if (!crop.ready) return;
+      var t = Number(cropZoom.value) / 100;
+      setScale(crop.minScale + t * (crop.maxScale - crop.minScale));
+    });
+
+    function puntoEnStage(ev) {
+      var rect = cropStage.getBoundingClientRect();
+      var pt = ev.touches ? ev.touches[0] : ev;
+      return { x: pt.clientX - rect.left, y: pt.clientY - rect.top };
+    }
+    cropStage.addEventListener("pointerdown", function (e) {
+      if (!crop.ready) return;
+      crop.drag = true;
+      crop.lastX = e.clientX;
+      crop.lastY = e.clientY;
+      try { cropStage.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+    cropStage.addEventListener("pointermove", function (e) {
+      if (!crop.drag || !crop.ready) return;
+      crop.x += e.clientX - crop.lastX;
+      crop.y += e.clientY - crop.lastY;
+      crop.lastX = e.clientX;
+      crop.lastY = e.clientY;
+      clampCrop();
+      pintarCrop();
+    });
+    function finDrag() { crop.drag = false; }
+    cropStage.addEventListener("pointerup", finDrag);
+    cropStage.addEventListener("pointercancel", finDrag);
+    cropStage.addEventListener("wheel", function (e) {
+      if (!crop.ready) return;
+      e.preventDefault();
+      var p = puntoEnStage(e);
+      setScale(crop.scale * (e.deltaY < 0 ? 1.08 : 0.92), p.x, p.y);
+    }, { passive: false });
+    cropStage.addEventListener("touchstart", function (e) {
+      if (e.touches.length === 2) {
+        crop.drag = false;
+        var a = e.touches[0], b = e.touches[1];
+        crop.pinch = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+        crop.pinchScale = crop.scale;
+      }
+    }, { passive: true });
+    cropStage.addEventListener("touchmove", function (e) {
+      if (e.touches.length === 2 && crop.ready && crop.pinch) {
+        var a = e.touches[0], b = e.touches[1];
+        var d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+        setScale(crop.pinchScale * (d / crop.pinch));
+      }
+    }, { passive: true });
+
+    function subirArchivo(file) {
       var pin = document.getElementById("pin").value;
-      if (!file) { estado.textContent = slot === "cancion" ? "Elige un mp3." : "Elige una imagen."; return; }
-      if (!pin) { estado.textContent = "Escribe el PIN."; return; }
       var data = new FormData();
       data.append("slot", slot);
       data.append("pin", pin);
-      data.append("foto", file);
+      data.append("foto", file, file.name || "polaroid.jpg");
       estado.textContent = "Subiendo…";
       fetch("/mome/api/foto", { method: "POST", body: data })
         .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
@@ -225,10 +419,36 @@
           if (!res.ok) { estado.textContent = res.j.error || "No se pudo guardar."; return; }
           estado.textContent = res.j.mensaje || "Listo. Espera ~1 minuto y recarga /mome.";
           document.getElementById("foto").value = "";
-          slot = "1";
-          cargarEstado();
+          if (res.j.slot) slot = String(res.j.slot);
+          cargarEstado(true);
         })
         .catch(function () { estado.textContent = "Error de red. Inténtalo de nuevo."; });
+    }
+
+    document.getElementById("btnSubir").addEventListener("click", function () {
+      var file = document.getElementById("foto").files[0];
+      var pin = document.getElementById("pin").value;
+      if (!pin) { estado.textContent = "Escribe el PIN."; return; }
+      if (slot === "cancion") {
+        if (!file) { estado.textContent = "Elige un mp3."; return; }
+        subirArchivo(file);
+        return;
+      }
+      if (slot === "final") {
+        if (!file) { estado.textContent = "Elige una imagen para la foto final."; return; }
+        subirArchivo(file);
+        return;
+      }
+      if (!crop.ready) {
+        estado.textContent = slot === "nueva" ? "Elige una imagen y encuádrala." : "Espera a que cargue el encuadre.";
+        return;
+      }
+      estado.textContent = "Recortando…";
+      exportarCuadrado()
+        .then(function (blob) {
+          subirArchivo(new File([blob], "polaroid.jpg", { type: "image/jpeg" }));
+        })
+        .catch(function () { estado.textContent = "No se pudo recortar. Prueba otra foto."; });
     });
 
     document.getElementById("btnTextos").addEventListener("click", function () {
